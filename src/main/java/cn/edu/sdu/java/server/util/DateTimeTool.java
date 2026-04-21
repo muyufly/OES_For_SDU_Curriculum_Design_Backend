@@ -4,11 +4,14 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * DateTimeTool Date数据转换操作类
  */
 public class DateTimeTool {
+    private static final Logger log = LoggerFactory.getLogger(DateTimeTool.class);
     /**
      * formatDateTime 字串串转换日期
      * @param timeSrc
@@ -25,7 +28,7 @@ public class DateTimeTool {
             Date tmpDate = sdFormat.parse(timeSrc);
             return tmpDate;
         } catch (ParseException e) {
-            e.printStackTrace();
+            log.error("Failed to parse date time: timeSrc={}, format={}", timeSrc, f, e);
             return null;
         }
     }
