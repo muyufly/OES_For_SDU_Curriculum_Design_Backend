@@ -25,7 +25,7 @@ public class DateTimeTool {
             Date tmpDate = sdFormat.parse(timeSrc);
             return tmpDate;
         } catch (ParseException e) {
-            // TODO Auto-generated catch block
+            e.printStackTrace();
             return null;
         }
     }
