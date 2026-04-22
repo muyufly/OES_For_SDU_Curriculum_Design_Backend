@@ -7,46 +7,32 @@ import cn.edu.sdu.java.server.repositorys.*;
 import cn.edu.sdu.java.server.util.ComDataUtil;
 import cn.edu.sdu.java.server.util.CommonMethod;
 import cn.edu.sdu.java.server.util.DateTimeTool;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 import java.util.*;
-import java.util.List;
 
 @Service
 public class StudentService {
-    private static final Logger log = LoggerFactory.getLogger(StudentService.class);
     private final PersonRepository personRepository;  //人员数据操作自动注入
     private final StudentRepository studentRepository;  //学生数据操作自动注入
     private final UserRepository userRepository;  //学生数据操作自动注入
     private final UserTypeRepository userTypeRepository; //用户类型数据操作自动注入
     private final PasswordEncoder encoder;  //密码服务自动注入
-    private final FeeRepository feeRepository;  //消费数据操作自动注入
-    private final FamilyMemberRepository familyMemberRepository;
     private final SystemService systemService;
     private final ScoreRepository scoreRepository;
-    public StudentService(PersonRepository personRepository, StudentRepository studentRepository, UserRepository userRepository, UserTypeRepository userTypeRepository, PasswordEncoder encoder, FeeRepository feeRepository, FamilyMemberRepository familyMemberRepository, SystemService systemService, ScoreRepository scoreRepository) {
+    public StudentService(PersonRepository personRepository, StudentRepository studentRepository, UserRepository userRepository, UserTypeRepository userTypeRepository, PasswordEncoder encoder, SystemService systemService, ScoreRepository scoreRepository) {
         this.personRepository = personRepository;
         this.studentRepository = studentRepository;
         this.userRepository = userRepository;
         this.userTypeRepository = userTypeRepository;
         this.encoder = encoder;
-        this.feeRepository = feeRepository;
-        this.familyMemberRepository = familyMemberRepository;
         this.systemService = systemService;
         this.scoreRepository = scoreRepository;
     }
@@ -223,7 +209,6 @@ public class StudentService {
         return list;
     }
 
-
     public List<Map<String,Object>> getStudentMarkList(List<Score> sList) {
         String[] title = {"优", "良", "中", "及格", "不及格"};
         int[] count = new int[5];
@@ -231,9 +216,7 @@ public class StudentService {
         if (sList == null || sList.isEmpty())
             return list;
         Map<String,Object> m;
-        Course c;
         for (Score s : sList) {
-            c = s.getCourse();
             if (s.getMark() >= 90)
                 count[0]++;
             else if (s.getMark() >= 80)
@@ -255,93 +238,14 @@ public class StudentService {
         return list;
     }
 
-
-    public List<Map<String,Object>> getStudentFeeList(Integer personId) {
-        List<Fee> sList = feeRepository.findListByStudent(personId);  // 查询某个学生消费记录集合
-        List<Map<String,Object>> list = new ArrayList<>();
-        if (sList == null || sList.isEmpty())
-            return list;
-        Map<String,Object> m;
-        Course c;
-        for (Fee s : sList) {
-            m = new HashMap<>();
-            m.put("title", s.getDay());
-            m.put("value", s.getMoney());
-            list.add(m);
-        }
-        return list;
-    }
-
-
-
-
-    public String importFeeData(Integer personId, InputStream in){
-        try {
-            Student student = studentRepository.findById(personId).get();
-            XSSFWorkbook workbook = new XSSFWorkbook(in);  //打开Excl数据流
-            XSSFSheet sheet = workbook.getSheetAt(0);
-            Iterator<Row> rowIterator = sheet.iterator();
-            Row row;
-            Cell cell;
-            int i;
-            i = 1;
-            String day, money;
-            Optional<Fee> fOp;
-            double dMoney;
-            Fee f;
-            rowIterator.next();
-            while (rowIterator.hasNext()) {
-                row = rowIterator.next();
-                cell = row.getCell(0);
-                if (cell == null)
-                    break;
-                day = cell.getStringCellValue();  //获取一行消费记录 日期 金额
-                cell = row.getCell(1);
-                money = cell.getStringCellValue();
-                fOp = feeRepository.findByStudentPersonIdAndDay(personId, day);  //查询是否存在记录
-                if (fOp.isEmpty()) {
-                    f = new Fee();
-                    f.setDay(day);
-                    f.setStudent(student);  //不存在 添加
-                } else {
-                    f = fOp.get();  //存在 更新
-                }
-                if (money != null && !money.isEmpty())
-                    dMoney = Double.parseDouble(money);
-                else
-                    dMoney = 0d;
-                f.setMoney(dMoney);
-                feeRepository.save(f);
-            }
-            workbook.close();  //关闭Excl输入流
-            return null;
-        } catch (Exception e) {
-            log.error(e.getMessage());
-            return "上传错误！";
-        }
-
-    }
-
-    public DataResponse importFeeData(@RequestBody byte[] barr,
-                                      String personIdStr
-                                      ) {
-        Integer personId =  Integer.parseInt(personIdStr);
-        String msg = importFeeData(personId,new ByteArrayInputStream(barr));
-        if(msg == null)
-            return CommonMethod.getReturnMessageOK();
-        else
-            return CommonMethod.getReturnMessageError(msg);
-    }
-
     public ResponseEntity<StreamingResponseBody> getStudentListExcl( DataRequest dataRequest) {
         String numName = dataRequest.getString("numName");
         List<Map<String,Object>> list = getStudentMapList(numName);
         Integer[] widths = {8, 20, 10, 15, 15, 15, 25, 10, 15, 30, 20, 30};
-        int i, j, k;
+        int i, j;
         String[] titles = {"序号", "学号", "姓名", "学院", "专业", "班级", "证件号码", "性别", "出生日期", "邮箱", "电话", "地址"};
         String outPutSheetName = "student.xlsx";
         XSSFWorkbook wb = new XSSFWorkbook();
-        XSSFCellStyle styleTitle = CommonMethod.createCellStyle(wb, 20);
         XSSFSheet sheet = wb.createSheet(outPutSheetName);
         for (j = 0; j < widths.length; j++) {
             sheet.setColumnWidth(j, widths[j] * 256);
@@ -421,79 +325,6 @@ public class StudentService {
 
 
 
-    /*
-        FamilyMember
-     */
-    public DataResponse getFamilyMemberList(DataRequest dataRequest) {
-        Integer personId = dataRequest.getInteger("personId");
-        List<FamilyMember> fList = familyMemberRepository.findByStudentPersonId(personId);
-        List<Map<String,Object>> dataList = new ArrayList<>();
-        Map<String,Object> m;
-        if (fList != null) {
-            for (FamilyMember f : fList) {
-                m = new HashMap<>();
-                m.put("memberId", f.getMemberId());
-                m.put("personId", f.getStudent().getPersonId());
-                m.put("relation", f.getRelation());
-                m.put("name", f.getName());
-                m.put("gender", f.getGender());
-                m.put("age", f.getAge()+"");
-                m.put("unit", f.getUnit());
-                dataList.add(m);
-            }
-        }
-        return CommonMethod.getReturnData(dataList);
-    }
-
-    public DataResponse familyMemberSave(DataRequest dataRequest) {
-        Map<String,Object> form = dataRequest.getMap("form");
-        Integer personId = CommonMethod.getInteger(form,"personId");
-        Integer memberId = CommonMethod.getInteger(form,"memberId");
-        Optional<FamilyMember> op;
-        FamilyMember f = null;
-        if(memberId != null) {
-            op = familyMemberRepository.findById(memberId);
-            if(op.isPresent()) {
-                f = op.get();
-            }
-        }
-        if(f== null) {
-            f = new FamilyMember();
-            assert personId != null;
-            f.setStudent(studentRepository.findById(personId).get());
-        }
-        f.setRelation(CommonMethod.getString(form,"relation"));
-        f.setName(CommonMethod.getString(form,"name"));
-        f.setGender(CommonMethod.getString(form,"gender"));
-        f.setAge(CommonMethod.getInteger(form,"age"));
-        f.setUnit(CommonMethod.getString(form,"unit"));
-        familyMemberRepository.save(f);
-        return CommonMethod.getReturnMessageOK();
-    }
-
-    public DataResponse familyMemberDelete(DataRequest dataRequest) {
-        Integer memberId = dataRequest.getInteger("memberId");
-        Optional<FamilyMember> op;
-        op = familyMemberRepository.findById(memberId);
-        op.ifPresent(familyMemberRepository::delete);
-        return CommonMethod.getReturnMessageOK();
-    }
-
-
-    public DataResponse importFeeDataWeb(Map<String,Object> request,MultipartFile file) {
-        Integer personId = CommonMethod.getInteger(request, "personId");
-        try {
-            String msg= importFeeData(personId,file.getInputStream());
-            if(msg == null)
-                return CommonMethod.getReturnMessageOK();
-            else
-                return CommonMethod.getReturnMessageError(msg);
-        } catch (Exception e) {
-            log.error(e.getMessage());
-        }
-        return CommonMethod.getReturnMessageError("上传错误！");
-    }
-
     public DataResponse getStudentIntroduceData(DataRequest dataRequest) {
         Integer personId = dataRequest.getInteger("personId");
         Optional<Student> sOp;
@@ -512,7 +343,6 @@ public class StudentService {
         data.put("info", info);
         data.put("scoreList", getStudentScoreList(sList));
         data.put("markList", getStudentMarkList(sList));
-        data.put("feeList", getStudentFeeList(s.getPersonId()));
         return CommonMethod.getReturnData(data);//将前端所需数据保留Map对象里，返还前端
     }
 }

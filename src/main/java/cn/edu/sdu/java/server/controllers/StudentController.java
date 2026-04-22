@@ -87,21 +87,7 @@ public class StudentController {
 
 
 
-    /**
-     * importFeeData 前端上传消费流水Excl表数据服务
-     *
-     * @param barr         文件二进制数据
-     * @param uploader     上传者
-     * @param personIdStr student 主键
-     * @param fileName     前端上传的文件名
-     */
-    @PostMapping(path = "/importFeeData")
-    public DataResponse importFeeData(@RequestBody byte[] barr,
-                                      @RequestParam(name = "uploader") String uploader,
-                                      @RequestParam(name = "personId") String personIdStr,
-                                      @RequestParam(name = "fileName") String fileName) {
-        return studentService.importFeeData(barr, personIdStr);
-    }
+
 
     /**
      * getStudentListExcl 前端下载导出学生基本信息Excl表数据
@@ -120,33 +106,10 @@ public class StudentController {
         return studentService.getStudentPageData(dataRequest);
     }
 
-    /*
-        FamilyMember
-     */
-    @PostMapping("/getFamilyMemberList")
-    @PreAuthorize(" hasRole('ADMIN') or  hasRole('STUDENT')")
-    public DataResponse getFamilyMemberList(@Valid @RequestBody DataRequest dataRequest) {
-        return studentService.getFamilyMemberList(dataRequest);
-    }
-
-    @PostMapping("/familyMemberSave")
-    @PreAuthorize(" hasRole('ADMIN') or  hasRole('STUDENT')")
-    public DataResponse familyMemberSave(@Valid @RequestBody DataRequest dataRequest) {
-        return studentService.familyMemberSave(dataRequest);
-    }
-
-    @PostMapping("/familyMemberDelete")
-    @PreAuthorize(" hasRole('ADMIN') or  hasRole('STUDENT')")
-    public DataResponse familyMemberDelete(@Valid @RequestBody DataRequest dataRequest) {
-        return studentService.familyMemberDelete(dataRequest);
-    }
 
 
-    @PostMapping("/importFeeDataWeb")
-    @PreAuthorize("hasRole('STUDENT')")
-    public DataResponse importFeeDataWeb(@RequestParam Map<String,Object> request, @RequestParam("file") MultipartFile file) {
-        return studentService.importFeeDataWeb(request, file);
-    }
+
+
 
     @PostMapping("/getStudentIntroduceData")
     @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN')")
