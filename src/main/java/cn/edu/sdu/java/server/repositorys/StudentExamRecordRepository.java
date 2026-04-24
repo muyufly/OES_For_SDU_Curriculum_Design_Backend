@@ -36,4 +36,6 @@ public interface StudentExamRecordRepository extends JpaRepository<StudentExamRe
      */
     @Query("SELECT r FROM StudentExamRecord r WHERE r.student.personId IN :personIds")
     List<StudentExamRecord> findByStudentPersonIdIn(List<Integer> personIds);
+
+    boolean existsByQuestionQuestionId(Integer questionId);
 }

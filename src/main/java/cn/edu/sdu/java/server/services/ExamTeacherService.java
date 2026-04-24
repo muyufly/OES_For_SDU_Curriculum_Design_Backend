@@ -1,22 +1,26 @@
 package cn.edu.sdu.java.server.services;
 
 import cn.edu.sdu.java.server.models.*;
+import cn.edu.sdu.java.server.payload.request.DataRequest;
 import cn.edu.sdu.java.server.payload.response.DataResponse;
 import cn.edu.sdu.java.server.repositorys.*;
 import cn.edu.sdu.java.server.util.CommonMethod;
+import cn.edu.sdu.java.server.util.DateTimeTool;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * ExamTeacherService 教师端考试业务逻辑
- * 提供查看所带班级的考试记录、主观题批阅打分、成绩单导出等功能
- */
 @Service
 public class ExamTeacherService {
+    private static final Logger log = LoggerFactory.getLogger(ExamTeacherService.class);
 
     private final TeacherClassRepository teacherClassRepository;
     private final StudentRepository studentRepository;
@@ -25,6 +29,8 @@ public class ExamTeacherService {
     private final ScoreRepository scoreRepository;
     private final CourseRepository courseRepository;
     private final QuestionRepository questionRepository;
+    private final ExamQuestionRelRepository examQuestionRelRepository;
+    private final ExamPaperParser examPaperParser = new ExamPaperParser();
 
     public ExamTeacherService(TeacherClassRepository teacherClassRepository,
                               StudentRepository studentRepository,
@@ -32,7 +38,8 @@ public class ExamTeacherService {
                               ExamRepository examRepository,
                               ScoreRepository scoreRepository,
                               CourseRepository courseRepository,
-                              QuestionRepository questionRepository) {
+                              QuestionRepository questionRepository,
+                              ExamQuestionRelRepository examQuestionRelRepository) {
         this.teacherClassRepository = teacherClassRepository;
         this.studentRepository = studentRepository;
         this.studentExamRecordRepository = studentExamRecordRepository;
@@ -40,55 +47,245 @@ public class ExamTeacherService {
         this.scoreRepository = scoreRepository;
         this.courseRepository = courseRepository;
         this.questionRepository = questionRepository;
+        this.examQuestionRelRepository = examQuestionRelRepository;
     }
 
-    /**
-     * 查询教师所带班级学生的考试提交记录
-     */
-    public DataResponse getClassStudentExamRecords() {
-        Integer personId = CommonMethod.getPersonId();
-        if (personId == null) {
-            return CommonMethod.getReturnMessageError("无法获取当前用户信息");
+    public DataResponse getTeacherExams() {
+        Integer teacherId = CommonMethod.getPersonId();
+        if (teacherId == null) {
+            return CommonMethod.getReturnMessageError("无法获取当前教师信息");
         }
-
-        // 获取教师绑定的班级列表
-        List<TeacherClass> teacherClasses = teacherClassRepository.findByTeacherPersonId(personId);
-        if (teacherClasses.isEmpty()) {
-            return CommonMethod.getReturnMessageError("您尚未绑定任何班级");
-        }
-
-        List<String> classNames = teacherClasses.stream()
-                .map(TeacherClass::getClassName)
+        List<Map<String, Object>> result = examRepository.findByCreatorId(teacherId).stream()
+                .map(this::examToMap)
                 .collect(Collectors.toList());
+        return CommonMethod.getReturnData(result);
+    }
 
-        // 获取这些班级的所有学生
+    public DataResponse getExamDetail(Integer examId) {
+        Optional<Exam> examOp = examRepository.findById(examId);
+        if (examOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("试卷不存在");
+        }
+        Exam exam = examOp.get();
+        if (!ownsExam(exam)) {
+            return CommonMethod.getReturnMessageError("无权查看该试卷");
+        }
+        Map<String, Object> data = examToMap(exam);
+        List<Map<String, Object>> questions = examQuestionRelRepository.findByExamExamIdOrderBySortOrderAsc(examId)
+                .stream()
+                .map(rel -> questionToMap(rel.getQuestion(), rel.getSortOrder()))
+                .collect(Collectors.toList());
+        data.put("questions", questions);
+        data.put("hasRecords", !studentExamRecordRepository.findByExamExamId(examId).isEmpty());
+        return CommonMethod.getReturnData(data);
+    }
+
+    @Transactional
+    public DataResponse updateExam(Integer examId, DataRequest request) {
+        Optional<Exam> examOp = examRepository.findById(examId);
+        if (examOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("试卷不存在");
+        }
+        Exam exam = examOp.get();
+        if (!ownsExam(exam)) {
+            return CommonMethod.getReturnMessageError("无权修改该试卷");
+        }
+        String title = request.getString("title");
+        Integer courseId = request.getInteger("courseId");
+        String startTime = request.getString("startTime");
+        String endTime = request.getString("endTime");
+        String status = normalizeStatus(request.getString("status"));
+        if (isBlank(title) || courseId == null || isBlank(startTime) || isBlank(endTime) || status == null) {
+            return CommonMethod.getReturnMessageError("试卷标题、课程、时间和状态不能为空");
+        }
+        Optional<Course> courseOp = courseRepository.findById(courseId);
+        if (courseOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("课程不存在");
+        }
+        exam.setTitle(title.trim());
+        exam.setCourse(courseOp.get());
+        exam.setStartTime(startTime.trim());
+        exam.setEndTime(endTime.trim());
+        exam.setStatus(status);
+        examRepository.save(exam);
+        return CommonMethod.getReturnData(examToMap(exam), "试卷修改成功");
+    }
+
+    @Transactional
+    public DataResponse updateQuestion(Integer questionId, DataRequest request) {
+        Optional<Question> questionOp = questionRepository.findById(questionId);
+        if (questionOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("题目不存在");
+        }
+        Question question = questionOp.get();
+        if (question.getExam() == null || !ownsExam(question.getExam())) {
+            return CommonMethod.getReturnMessageError("无权修改该题目");
+        }
+        String type = normalizeQuestionType(request.getString("questionType"));
+        String content = request.getString("content");
+        Integer score = request.getInteger("score");
+        if (type == null || isBlank(content) || score == null || score <= 0) {
+            return CommonMethod.getReturnMessageError("题型、题干和分值不能为空");
+        }
+        question.setQuestionType(type);
+        question.setContent(content.trim());
+        question.setOptionA(emptyToNull(request.getString("optionA")));
+        question.setOptionB(emptyToNull(request.getString("optionB")));
+        question.setOptionC(emptyToNull(request.getString("optionC")));
+        question.setOptionD(emptyToNull(request.getString("optionD")));
+        question.setAnswer(emptyToNull(request.getString("answer")));
+        question.setScore(score);
+        String validation = validateQuestion(question);
+        if (validation != null) {
+            return CommonMethod.getReturnMessageError(validation);
+        }
+        questionRepository.save(question);
+        return CommonMethod.getReturnData(questionToMap(question, null), "题目修改成功");
+    }
+
+    @Transactional
+    public DataResponse deleteQuestion(Integer questionId) {
+        Optional<Question> questionOp = questionRepository.findById(questionId);
+        if (questionOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("题目不存在");
+        }
+        Question question = questionOp.get();
+        if (question.getExam() == null || !ownsExam(question.getExam())) {
+            return CommonMethod.getReturnMessageError("无权删除该题目");
+        }
+        if (studentExamRecordRepository.existsByQuestionQuestionId(questionId)) {
+            return CommonMethod.getReturnMessageError("该题目已有学生提交记录，不能删除");
+        }
+        examQuestionRelRepository.deleteByQuestionQuestionId(questionId);
+        questionRepository.delete(question);
+        return CommonMethod.getReturnMessageOK("题目删除成功");
+    }
+
+    @Transactional
+    public DataResponse uploadExamPaper(MultipartFile file, ExamPaperParser.CsvMeta csvMeta) {
+        Integer teacherId = CommonMethod.getPersonId();
+        if (teacherId == null) {
+            return CommonMethod.getReturnMessageError("无法获取当前教师信息");
+        }
+        try {
+            String fileName = file.getOriginalFilename();
+            String content = new String(file.getBytes(), StandardCharsets.UTF_8);
+            ExamPaperParser.ParsedExam parsed = examPaperParser.parse(fileName, content, csvMeta);
+            Optional<Course> courseOp = courseRepository.findById(parsed.courseId);
+            if (courseOp.isEmpty()) {
+                return CommonMethod.getReturnMessageError("课程不存在：" + parsed.courseId);
+            }
+
+            Exam exam = new Exam();
+            exam.setTitle(parsed.title);
+            exam.setCourse(courseOp.get());
+            exam.setStartTime(parsed.startTime);
+            exam.setEndTime(parsed.endTime);
+            exam.setStatus(parsed.status);
+            exam.setCreatorId(teacherId);
+            exam.setCreateTime(DateTimeTool.parseDateTime(new Date()));
+            examRepository.save(exam);
+
+            int sortOrder = 1;
+            for (ExamPaperParser.ParsedQuestion parsedQuestion : parsed.questions) {
+                Question question = new Question();
+                question.setExam(exam);
+                question.setQuestionType(parsedQuestion.questionType);
+                question.setContent(parsedQuestion.content);
+                question.setOptionA(emptyToNull(parsedQuestion.optionA));
+                question.setOptionB(emptyToNull(parsedQuestion.optionB));
+                question.setOptionC(emptyToNull(parsedQuestion.optionC));
+                question.setOptionD(emptyToNull(parsedQuestion.optionD));
+                question.setAnswer(emptyToNull(parsedQuestion.answer));
+                question.setScore(parsedQuestion.score);
+                questionRepository.save(question);
+
+                ExamQuestionRel rel = new ExamQuestionRel();
+                rel.setExam(exam);
+                rel.setQuestion(question);
+                rel.setSortOrder(sortOrder++);
+                examQuestionRelRepository.save(rel);
+            }
+            return CommonMethod.getReturnData(examToMap(exam), "试卷上传成功");
+        } catch (Exception e) {
+            log.error("试卷上传解析失败", e);
+            return CommonMethod.getReturnMessageError(e.getMessage());
+        }
+    }
+
+    public DataResponse getExamRecords(Integer examId) {
+        Optional<Exam> examOp = examRepository.findById(examId);
+        if (examOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("试卷不存在");
+        }
+        if (!ownsExam(examOp.get())) {
+            return CommonMethod.getReturnMessageError("无权查看该试卷记录");
+        }
+        Set<Integer> managedStudentIds = getManagedStudentIds();
+        List<Map<String, Object>> result = studentExamRecordRepository.findByExamExamId(examId).stream()
+                .filter(record -> managedStudentIds.contains(record.getStudent().getPersonId()))
+                .map(this::recordToMap)
+                .collect(Collectors.toList());
+        return CommonMethod.getReturnData(result);
+    }
+
+    public DataResponse getTeacherScores(Integer examId, String className, String keyword) {
+        Set<Integer> managedStudentIds = getManagedStudentIds();
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (examId != null && examId > 0) {
+            Map<Integer, List<StudentExamRecord>> groups = studentExamRecordRepository.findByExamExamId(examId).stream()
+                    .filter(record -> managedStudentIds.contains(record.getStudent().getPersonId()))
+                    .collect(Collectors.groupingBy(record -> record.getStudent().getPersonId()));
+            for (List<StudentExamRecord> records : groups.values()) {
+                Student student = records.get(0).getStudent();
+                if (!matchesStudent(student, className, keyword)) {
+                    continue;
+                }
+                int total = records.stream().mapToInt(r -> r.getScore() == null ? 0 : r.getScore()).sum();
+                boolean allGraded = records.stream().allMatch(r -> r.getGraded() == 1);
+                Map<String, Object> map = studentToMap(student);
+                map.put("examId", examId);
+                map.put("examTitle", records.get(0).getExam().getTitle());
+                map.put("totalScore", total);
+                map.put("allGraded", allGraded);
+                map.put("submitTime", records.get(0).getSubmitTime());
+                result.add(map);
+            }
+            return CommonMethod.getReturnData(result);
+        }
+        for (Integer studentId : managedStudentIds) {
+            for (Score score : scoreRepository.findByStudentPersonId(studentId)) {
+                Student student = score.getStudent();
+                if (!matchesStudent(student, className, keyword)) {
+                    continue;
+                }
+                Map<String, Object> map = studentToMap(student);
+                map.put("scoreId", score.getScoreId());
+                map.put("courseId", score.getCourse() == null ? null : score.getCourse().getCourseId());
+                map.put("courseNum", score.getCourse() == null ? "" : score.getCourse().getNum());
+                map.put("courseName", score.getCourse() == null ? "" : score.getCourse().getName());
+                map.put("mark", score.getMark());
+                map.put("ranking", score.getRanking());
+                result.add(map);
+            }
+        }
+        return CommonMethod.getReturnData(result);
+    }
+
+    public DataResponse getClassStudentExamRecords() {
         List<Map<String, Object>> resultList = new ArrayList<>();
-        for (String className : classNames) {
-            List<Student> students = studentRepository.findByClassName(className);
+        List<String> classNames = getTeacherClassNames();
+        for (String cn : classNames) {
+            List<Student> students = studentRepository.findByClassName(cn);
             for (Student s : students) {
-                // 查询该学生的所有考试记录（按考试分组汇总）
-                List<Integer> singleList = List.of(s.getPersonId());
-                List<StudentExamRecord> records = studentExamRecordRepository
-                        .findByStudentPersonIdIn(singleList);
-
-                // 按考试ID分组
+                List<StudentExamRecord> records = studentExamRecordRepository.findByStudentPersonIdIn(List.of(s.getPersonId()));
                 Map<Integer, List<StudentExamRecord>> examGroups = records.stream()
                         .collect(Collectors.groupingBy(r -> r.getExam().getExamId()));
-
                 for (Map.Entry<Integer, List<StudentExamRecord>> entry : examGroups.entrySet()) {
                     List<StudentExamRecord> examRecords = entry.getValue();
-                    int totalScore = 0;
-                    boolean allGraded = true;
-                    for (StudentExamRecord r : examRecords) {
-                        if (r.getScore() != null) totalScore += r.getScore();
-                        if (r.getGraded() == 0) allGraded = false;
-                    }
-
-                    Map<String, Object> m = new HashMap<>();
-                    m.put("personId", s.getPersonId());
-                    m.put("studentName", s.getPerson() != null ? s.getPerson().getName() : "");
-                    m.put("studentNum", s.getPerson() != null ? s.getPerson().getNum() : "");
-                    m.put("className", className);
+                    int totalScore = examRecords.stream().mapToInt(r -> r.getScore() == null ? 0 : r.getScore()).sum();
+                    boolean allGraded = examRecords.stream().allMatch(r -> r.getGraded() == 1);
+                    Map<String, Object> m = studentToMap(s);
                     m.put("examId", entry.getKey());
                     m.put("examTitle", examRecords.get(0).getExam().getTitle());
                     m.put("totalScore", totalScore);
@@ -98,72 +295,55 @@ public class ExamTeacherService {
                 }
             }
         }
-
         return CommonMethod.getReturnData(resultList);
     }
 
-    /**
-     * 为指定学生的阅读题进行主观打分
-     * 并在所有题目批阅完成后，将总成绩更新到现有的 score 表中
-     */
     public DataResponse gradeRecord(Integer recordId, Integer gradeScore) {
         Optional<StudentExamRecord> recordOp = studentExamRecordRepository.findById(recordId);
         if (recordOp.isEmpty()) {
             return CommonMethod.getReturnMessageError("答题记录不存在");
         }
-
         StudentExamRecord record = recordOp.get();
+        if (!getManagedStudentIds().contains(record.getStudent().getPersonId())) {
+            return CommonMethod.getReturnMessageError("无权批改该学生记录");
+        }
         if (!"READ".equals(record.getQuestion().getQuestionType())) {
             return CommonMethod.getReturnMessageError("该题为客观题，已自动判分");
         }
-
-        // 检查分值不超过题目满分
-        if (gradeScore != null && gradeScore > record.getQuestion().getScore()) {
+        if (gradeScore == null || gradeScore < 0) {
+            return CommonMethod.getReturnMessageError("分数不能小于 0");
+        }
+        if (gradeScore > record.getQuestion().getScore()) {
             return CommonMethod.getReturnMessageError("打分不能超过题目满分 " + record.getQuestion().getScore());
         }
-
-        record.setScore(gradeScore != null ? gradeScore : 0);
+        record.setScore(gradeScore);
         record.setGraded(1);
         studentExamRecordRepository.save(record);
 
-        // 检查该学生该考试的所有题目是否全部批阅完毕
         Integer personId = record.getStudent().getPersonId();
         Integer examId = record.getExam().getExamId();
-        List<StudentExamRecord> allRecords = studentExamRecordRepository
-                .findByStudentPersonIdAndExamExamId(personId, examId);
-
+        List<StudentExamRecord> allRecords = studentExamRecordRepository.findByStudentPersonIdAndExamExamId(personId, examId);
         boolean allGraded = allRecords.stream().allMatch(r -> r.getGraded() == 1);
         if (allGraded) {
-            // 计算总分并同步到 score 表
-            int totalScore = allRecords.stream()
-                    .mapToInt(r -> r.getScore() != null ? r.getScore() : 0)
-                    .sum();
+            int totalScore = allRecords.stream().mapToInt(r -> r.getScore() == null ? 0 : r.getScore()).sum();
             syncToScoreTable(personId, record.getExam(), totalScore);
         }
-
         return CommonMethod.getReturnMessageOK("批阅成功");
     }
 
-    /**
-     * 将考试总成绩同步到现有的 score 表
-     */
     private void syncToScoreTable(Integer personId, Exam exam, int totalScore) {
         if (exam.getCourse() == null) return;
-
-        // 查找或创建 score 记录
-        List<Score> existingScores = scoreRepository.findByStudentPersonId(personId);
         Score targetScore = null;
-        for (Score s : existingScores) {
-            if (s.getCourse().getCourseId().equals(exam.getCourse().getCourseId())) {
+        for (Score s : scoreRepository.findByStudentPersonId(personId)) {
+            if (s.getCourse() != null && s.getCourse().getCourseId().equals(exam.getCourse().getCourseId())) {
                 targetScore = s;
                 break;
             }
         }
-
         if (targetScore == null) {
-            targetScore = new Score();
             Optional<Student> sOp = studentRepository.findById(personId);
             if (sOp.isEmpty()) return;
+            targetScore = new Score();
             targetScore.setStudent(sOp.get());
             targetScore.setCourse(exam.getCourse());
         }
@@ -171,9 +351,6 @@ public class ExamTeacherService {
         scoreRepository.save(targetScore);
     }
 
-    /**
-     * 导出当前考试的成绩单（CSV 格式）
-     */
     public void exportExamScores(Integer examId, HttpServletResponse response) {
         try {
             Optional<Exam> examOp = examRepository.findById(examId);
@@ -181,45 +358,164 @@ public class ExamTeacherService {
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 return;
             }
-            Exam exam = examOp.get();
-
             List<StudentExamRecord> allRecords = studentExamRecordRepository.findByExamExamId(examId);
-            // 按学生分组
             Map<Integer, List<StudentExamRecord>> studentGroups = allRecords.stream()
                     .collect(Collectors.groupingBy(r -> r.getStudent().getPersonId()));
-
             response.setContentType("text/csv;charset=UTF-8");
-            response.setHeader("Content-Disposition",
-                    "attachment; filename=exam_" + examId + "_scores.csv");
+            response.setHeader("Content-Disposition", "attachment; filename=exam_" + examId + "_scores.csv");
             response.setCharacterEncoding("UTF-8");
-
             PrintWriter writer = response.getWriter();
-            // 写入 BOM 以支持 Excel 中文
             writer.write('\uFEFF');
-            // CSV 表头
             writer.println("学号,姓名,班级,总分,批阅状态,提交时间");
-
-            for (Map.Entry<Integer, List<StudentExamRecord>> entry : studentGroups.entrySet()) {
-                List<StudentExamRecord> records = entry.getValue();
-                StudentExamRecord first = records.get(0);
-                Student student = first.getStudent();
-                String num = student.getPerson() != null ? student.getPerson().getNum() : "";
-                String name = student.getPerson() != null ? student.getPerson().getName() : "";
-                String className = student.getClassName() != null ? student.getClassName() : "";
-
-                int totalScore = records.stream()
-                        .mapToInt(r -> r.getScore() != null ? r.getScore() : 0)
-                        .sum();
+            for (List<StudentExamRecord> records : studentGroups.values()) {
+                Student student = records.get(0).getStudent();
+                int totalScore = records.stream().mapToInt(r -> r.getScore() == null ? 0 : r.getScore()).sum();
                 boolean allGraded = records.stream().allMatch(r -> r.getGraded() == 1);
-                String submitTime = first.getSubmitTime() != null ? first.getSubmitTime() : "";
-
                 writer.printf("%s,%s,%s,%d,%s,%s%n",
-                        num, name, className, totalScore,
-                        allGraded ? "已批阅" : "待批阅", submitTime);
+                        student.getPerson() != null ? student.getPerson().getNum() : "",
+                        student.getPerson() != null ? student.getPerson().getName() : "",
+                        student.getClassName() != null ? student.getClassName() : "",
+                        totalScore,
+                        allGraded ? "已批阅" : "待批阅",
+                        records.get(0).getSubmitTime() != null ? records.get(0).getSubmitTime() : "");
             }
             writer.flush();
         } catch (Exception e) {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    private boolean ownsExam(Exam exam) {
+        Integer teacherId = CommonMethod.getPersonId();
+        return teacherId != null && exam.getCreatorId() != null && exam.getCreatorId().equals(teacherId);
+    }
+
+    private Set<Integer> getManagedStudentIds() {
+        Set<Integer> ids = new HashSet<>();
+        for (String className : getTeacherClassNames()) {
+            for (Student student : studentRepository.findByClassName(className)) {
+                ids.add(student.getPersonId());
+            }
+        }
+        return ids;
+    }
+
+    private List<String> getTeacherClassNames() {
+        Integer teacherId = CommonMethod.getPersonId();
+        if (teacherId == null) {
+            return List.of();
+        }
+        return teacherClassRepository.findByTeacherPersonId(teacherId).stream()
+                .map(TeacherClass::getClassName)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    private Map<String, Object> examToMap(Exam exam) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("examId", exam.getExamId());
+        map.put("title", exam.getTitle());
+        map.put("startTime", exam.getStartTime());
+        map.put("endTime", exam.getEndTime());
+        map.put("status", exam.getStatus());
+        map.put("creatorId", exam.getCreatorId());
+        map.put("createTime", exam.getCreateTime());
+        if (exam.getCourse() != null) {
+            map.put("courseId", exam.getCourse().getCourseId());
+            map.put("courseNum", exam.getCourse().getNum());
+            map.put("courseName", exam.getCourse().getName());
+        }
+        return map;
+    }
+
+    private Map<String, Object> questionToMap(Question question, Integer sortOrder) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("questionId", question.getQuestionId());
+        map.put("examId", question.getExam() == null ? null : question.getExam().getExamId());
+        map.put("questionType", question.getQuestionType());
+        map.put("content", question.getContent());
+        map.put("optionA", question.getOptionA());
+        map.put("optionB", question.getOptionB());
+        map.put("optionC", question.getOptionC());
+        map.put("optionD", question.getOptionD());
+        map.put("answer", question.getAnswer());
+        map.put("score", question.getScore());
+        map.put("sortOrder", sortOrder);
+        return map;
+    }
+
+    private Map<String, Object> recordToMap(StudentExamRecord record) {
+        Map<String, Object> map = studentToMap(record.getStudent());
+        map.put("recordId", record.getRecordId());
+        map.put("examId", record.getExam().getExamId());
+        map.put("examTitle", record.getExam().getTitle());
+        map.put("questionId", record.getQuestion().getQuestionId());
+        map.put("questionType", record.getQuestion().getQuestionType());
+        map.put("questionContent", record.getQuestion().getContent());
+        map.put("standardAnswer", record.getQuestion().getAnswer());
+        map.put("answer", record.getAnswer());
+        map.put("score", record.getScore());
+        map.put("maxScore", record.getQuestion().getScore());
+        map.put("graded", record.getGraded());
+        map.put("submitTime", record.getSubmitTime());
+        return map;
+    }
+
+    private Map<String, Object> studentToMap(Student student) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("personId", student.getPersonId());
+        map.put("className", student.getClassName());
+        if (student.getPerson() != null) {
+            map.put("studentNum", student.getPerson().getNum());
+            map.put("studentName", student.getPerson().getName());
+        }
+        return map;
+    }
+
+    private boolean matchesStudent(Student student, String className, String keyword) {
+        if (!isBlank(className) && !className.equals(student.getClassName())) {
+            return false;
+        }
+        if (isBlank(keyword)) {
+            return true;
+        }
+        String text = keyword.trim();
+        String num = student.getPerson() == null ? "" : student.getPerson().getNum();
+        String name = student.getPerson() == null ? "" : student.getPerson().getName();
+        return num.contains(text) || name.contains(text);
+    }
+
+    private String validateQuestion(Question question) {
+        if ("CHOICE".equals(question.getQuestionType())) {
+            if (isBlank(question.getOptionA()) || isBlank(question.getOptionB()) ||
+                    isBlank(question.getOptionC()) || isBlank(question.getOptionD())) {
+                return "选择题必须填写 A/B/C/D 四个选项";
+            }
+            if (isBlank(question.getAnswer()) || !question.getAnswer().matches("(?i)[ABCD]")) {
+                return "选择题答案必须为 A/B/C/D";
+            }
+            question.setAnswer(question.getAnswer().toUpperCase(Locale.ROOT));
+        }
+        return null;
+    }
+
+    private String normalizeQuestionType(String value) {
+        if (value == null) return null;
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        return ("CHOICE".equals(normalized) || "READ".equals(normalized)) ? normalized : null;
+    }
+
+    private String normalizeStatus(String value) {
+        if (value == null) return null;
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        return ("DRAFT".equals(normalized) || "OPEN".equals(normalized) || "CLOSED".equals(normalized)) ? normalized : null;
+    }
+
+    private String emptyToNull(String value) {
+        return isBlank(value) ? null : value.trim();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

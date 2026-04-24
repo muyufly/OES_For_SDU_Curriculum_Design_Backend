@@ -18,4 +18,6 @@ public interface ExamQuestionRelRepository extends JpaRepository<ExamQuestionRel
      * 根据考试ID和题目ID查询关联记录
      */
     ExamQuestionRel findByExamExamIdAndQuestionQuestionId(Integer examId, Integer questionId);
+
+    void deleteByQuestionQuestionId(Integer questionId);
 }

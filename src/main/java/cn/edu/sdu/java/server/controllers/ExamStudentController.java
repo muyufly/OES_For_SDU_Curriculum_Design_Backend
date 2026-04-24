@@ -56,4 +56,11 @@ public class ExamStudentController {
         List<?> answers = dataRequest.getList("answers");
         return examStudentService.submitExam(examId, answers);
     }
+
+    @GetMapping("/{examId}/result")
+    @RequireRole("STUDENT")
+    public DataResponse getExamResult(@PathVariable Integer examId) {
+        return examStudentService.getExamResult(examId);
+    }
+
 }

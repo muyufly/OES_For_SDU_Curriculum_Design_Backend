@@ -3,10 +3,13 @@ package cn.edu.sdu.java.server.controllers;
 import cn.edu.sdu.java.server.annotations.RequireRole;
 import cn.edu.sdu.java.server.payload.request.DataRequest;
 import cn.edu.sdu.java.server.payload.response.DataResponse;
+import cn.edu.sdu.java.server.services.ExamPaperParser;
 import cn.edu.sdu.java.server.services.ExamTeacherService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * ExamTeacherController 教师端考试 API
@@ -21,6 +24,69 @@ public class ExamTeacherController {
 
     public ExamTeacherController(ExamTeacherService examTeacherService) {
         this.examTeacherService = examTeacherService;
+    }
+
+    @GetMapping("/exams")
+    @RequireRole("TEACHER")
+    public DataResponse getTeacherExams() {
+        return examTeacherService.getTeacherExams();
+    }
+
+    @PostMapping(value = "/exams/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequireRole("TEACHER")
+    public DataResponse uploadExam(@RequestParam("file") MultipartFile file,
+                                   @RequestParam(required = false) String title,
+                                   @RequestParam(required = false) Integer courseId,
+                                   @RequestParam(required = false) String startTime,
+                                   @RequestParam(required = false) String endTime,
+                                   @RequestParam(required = false) String status) {
+        ExamPaperParser.CsvMeta meta = new ExamPaperParser.CsvMeta();
+        meta.title = title;
+        meta.courseId = courseId;
+        meta.startTime = startTime;
+        meta.endTime = endTime;
+        meta.status = status;
+        return examTeacherService.uploadExamPaper(file, meta);
+    }
+
+    @GetMapping("/exams/{examId}")
+    @RequireRole("TEACHER")
+    public DataResponse getExamDetail(@PathVariable Integer examId) {
+        return examTeacherService.getExamDetail(examId);
+    }
+
+    @PutMapping("/exams/{examId}")
+    @RequireRole("TEACHER")
+    public DataResponse updateExam(@PathVariable Integer examId,
+                                   @Valid @RequestBody DataRequest dataRequest) {
+        return examTeacherService.updateExam(examId, dataRequest);
+    }
+
+    @PutMapping("/questions/{questionId}")
+    @RequireRole("TEACHER")
+    public DataResponse updateQuestion(@PathVariable Integer questionId,
+                                       @Valid @RequestBody DataRequest dataRequest) {
+        return examTeacherService.updateQuestion(questionId, dataRequest);
+    }
+
+    @DeleteMapping("/questions/{questionId}")
+    @RequireRole("TEACHER")
+    public DataResponse deleteQuestion(@PathVariable Integer questionId) {
+        return examTeacherService.deleteQuestion(questionId);
+    }
+
+    @GetMapping("/exams/{examId}/records")
+    @RequireRole("TEACHER")
+    public DataResponse getExamRecords(@PathVariable Integer examId) {
+        return examTeacherService.getExamRecords(examId);
+    }
+
+    @GetMapping("/scores")
+    @RequireRole("TEACHER")
+    public DataResponse getTeacherScores(@RequestParam(required = false) Integer examId,
+                                         @RequestParam(required = false) String className,
+                                         @RequestParam(required = false) String keyword) {
+        return examTeacherService.getTeacherScores(examId, className, keyword);
     }
 
     /**

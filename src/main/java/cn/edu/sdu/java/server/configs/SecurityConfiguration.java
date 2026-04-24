@@ -44,6 +44,7 @@ public class SecurityConfiguration {
                         authz -> {
                             try {
                                 authz
+                                        .requestMatchers("/auth/**").permitAll()
                                         .requestMatchers("/api/**").authenticated()
                                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                                         .anyRequest().permitAll();
