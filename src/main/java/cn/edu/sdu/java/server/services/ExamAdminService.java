@@ -24,19 +24,181 @@ public class ExamAdminService {
     private final TeacherClassRepository teacherClassRepository;
     private final ScoreRepository scoreRepository;
     private final StudentRepository studentRepository;
+    private final ExamRepository examRepository;
+    private final CourseRepository courseRepository;
+    private final StudentExamAttemptRepository studentExamAttemptRepository;
+    private final StudentExamRecordRepository studentExamRecordRepository;
 
     public ExamAdminService(UserRepository userRepository,
                             UserTypeRepository userTypeRepository,
                             TeacherRepository teacherRepository,
                             TeacherClassRepository teacherClassRepository,
                             ScoreRepository scoreRepository,
-                            StudentRepository studentRepository) {
+                            StudentRepository studentRepository,
+                            ExamRepository examRepository,
+                            CourseRepository courseRepository,
+                            StudentExamAttemptRepository studentExamAttemptRepository,
+                            StudentExamRecordRepository studentExamRecordRepository) {
         this.userRepository = userRepository;
         this.userTypeRepository = userTypeRepository;
         this.teacherRepository = teacherRepository;
         this.teacherClassRepository = teacherClassRepository;
         this.scoreRepository = scoreRepository;
         this.studentRepository = studentRepository;
+        this.examRepository = examRepository;
+        this.courseRepository = courseRepository;
+        this.studentExamAttemptRepository = studentExamAttemptRepository;
+        this.studentExamRecordRepository = studentExamRecordRepository;
+    }
+
+    public DataResponse getOverview() {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("userCount", userRepository.count());
+        data.put("studentCount", studentRepository.count());
+        data.put("teacherCount", teacherRepository.count());
+        data.put("courseCount", courseRepository.count());
+        data.put("examCount", examRepository.count());
+        data.put("scoreCount", scoreRepository.count());
+        data.put("attemptCount", studentExamAttemptRepository.count());
+        data.put("endedAttemptCount", studentExamAttemptRepository.findAll().stream()
+                .filter(a -> "ENDED".equals(a.getStatus())).count());
+        data.put("draftAttemptCount", studentExamAttemptRepository.findAll().stream()
+                .filter(a -> "DRAFT".equals(a.getStatus())).count());
+        data.put("openExamCount", examRepository.findAll().stream()
+                .filter(e -> "OPEN".equals(e.getStatus())).count());
+
+        List<Map<String, Object>> statusRows = new ArrayList<>();
+        Map<String, Long> statusCount = new LinkedHashMap<>();
+        for (Exam exam : examRepository.findAll()) {
+            statusCount.put(exam.getStatus(), statusCount.getOrDefault(exam.getStatus(), 0L) + 1);
+        }
+        for (Map.Entry<String, Long> entry : statusCount.entrySet()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("status", entry.getKey());
+            row.put("count", entry.getValue());
+            statusRows.add(row);
+        }
+        data.put("examStatusRows", statusRows);
+        return CommonMethod.getReturnData(data);
+    }
+
+    public DataResponse getUsers(String keyword, String roleName) {
+        String key = keyword == null ? "" : keyword.trim().toLowerCase(Locale.ROOT);
+        String role = normalizeRoleFilter(roleName);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (User user : userRepository.findAll()) {
+            Map<String, Object> map = userToMap(user);
+            String roleValue = Objects.toString(map.get("roleName"), "");
+            if (role != null && !role.equals(roleValue)) {
+                continue;
+            }
+            String haystack = (Objects.toString(map.get("userName"), "") + " "
+                    + Objects.toString(map.get("personNum"), "") + " "
+                    + Objects.toString(map.get("personName"), "") + " "
+                    + Objects.toString(map.get("dept"), "")).toLowerCase(Locale.ROOT);
+            if (!key.isEmpty() && !haystack.contains(key)) {
+                continue;
+            }
+            result.add(map);
+        }
+        result.sort(Comparator.comparing(m -> Objects.toString(m.get("userName"), "")));
+        return CommonMethod.getReturnData(result);
+    }
+
+    public DataResponse getTeachers(String keyword) {
+        String key = keyword == null ? "" : keyword.trim().toLowerCase(Locale.ROOT);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Teacher teacher : teacherRepository.findAll()) {
+            Map<String, Object> map = teacherToMap(teacher);
+            String haystack = (Objects.toString(map.get("teacherNum"), "") + " "
+                    + Objects.toString(map.get("teacherName"), "") + " "
+                    + Objects.toString(map.get("dept"), "")).toLowerCase(Locale.ROOT);
+            if (key.isEmpty() || haystack.contains(key)) {
+                result.add(map);
+            }
+        }
+        result.sort(Comparator.comparing(m -> Objects.toString(m.get("teacherNum"), "")));
+        return CommonMethod.getReturnData(result);
+    }
+
+    public DataResponse getClasses() {
+        Set<String> classes = new TreeSet<>();
+        for (Student student : studentRepository.findAll()) {
+            if (student.getClassName() != null && !student.getClassName().isBlank()) {
+                classes.add(student.getClassName());
+            }
+        }
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (String className : classes) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("className", className);
+            row.put("studentCount", studentRepository.findByClassName(className).size());
+            result.add(row);
+        }
+        return CommonMethod.getReturnData(result);
+    }
+
+    public DataResponse getTeacherClasses(Integer teacherId) {
+        List<TeacherClass> bindings = teacherId == null || teacherId <= 0
+                ? teacherClassRepository.findAll()
+                : teacherClassRepository.findByTeacherPersonId(teacherId);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (TeacherClass binding : bindings) {
+            result.add(teacherClassToMap(binding));
+        }
+        result.sort(Comparator.comparing(m -> Objects.toString(m.get("teacherName"), "")));
+        return CommonMethod.getReturnData(result);
+    }
+
+    public DataResponse deleteTeacherClass(Integer id) {
+        if (id == null) {
+            return CommonMethod.getReturnMessageError("绑定ID不能为空");
+        }
+        if (!teacherClassRepository.existsById(id)) {
+            return CommonMethod.getReturnMessageError("绑定关系不存在");
+        }
+        teacherClassRepository.deleteById(id);
+        return CommonMethod.getReturnMessageOK("绑定关系已删除");
+    }
+
+    public DataResponse getExams(String keyword, String status) {
+        String key = keyword == null ? "" : keyword.trim().toLowerCase(Locale.ROOT);
+        String normalizedStatus = status == null || status.isBlank() ? null : status.trim().toUpperCase(Locale.ROOT);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Exam exam : examRepository.findAll()) {
+            if (normalizedStatus != null && !normalizedStatus.equals(exam.getStatus())) {
+                continue;
+            }
+            Map<String, Object> map = examToAdminMap(exam);
+            String haystack = (Objects.toString(map.get("title"), "") + " "
+                    + Objects.toString(map.get("courseName"), "") + " "
+                    + Objects.toString(map.get("creatorName"), "")).toLowerCase(Locale.ROOT);
+            if (key.isEmpty() || haystack.contains(key)) {
+                result.add(map);
+            }
+        }
+        result.sort((a, b) -> Integer.compare(
+                asInt(b.get("examId")),
+                asInt(a.get("examId"))));
+        return CommonMethod.getReturnData(result);
+    }
+
+    public DataResponse updateExamStatus(Integer examId, String status) {
+        if (examId == null) {
+            return CommonMethod.getReturnMessageError("试卷ID不能为空");
+        }
+        String normalized = normalizeExamStatus(status);
+        if (normalized == null) {
+            return CommonMethod.getReturnMessageError("状态必须为 DRAFT、OPEN 或 CLOSED");
+        }
+        Optional<Exam> examOp = examRepository.findById(examId);
+        if (examOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("试卷不存在");
+        }
+        Exam exam = examOp.get();
+        exam.setStatus(normalized);
+        examRepository.save(exam);
+        return CommonMethod.getReturnData(examToAdminMap(exam), "试卷状态已更新");
     }
 
     /**
@@ -147,5 +309,122 @@ public class ExamAdminService {
         data.put("pageSize", pageSize);
         data.put("dataList", dataList);
         return CommonMethod.getReturnData(data);
+    }
+
+    private Map<String, Object> userToMap(User user) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("personId", user.getPersonId());
+        map.put("userName", user.getUserName());
+        map.put("roleName", user.getUserType() == null ? "" : user.getUserType().getName());
+        map.put("loginCount", user.getLoginCount());
+        map.put("lastLoginTime", user.getLastLoginTime());
+        map.put("createTime", user.getCreateTime());
+        Person person = user.getPerson();
+        if (person != null) {
+            map.put("personNum", person.getNum());
+            map.put("personName", person.getName());
+            map.put("personType", person.getType());
+            map.put("dept", person.getDept());
+            map.put("email", person.getEmail());
+            map.put("phone", person.getPhone());
+        }
+        return map;
+    }
+
+    private Map<String, Object> teacherToMap(Teacher teacher) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("teacherId", teacher.getPersonId());
+        Person person = teacher.getPerson();
+        if (person != null) {
+            map.put("teacherNum", person.getNum());
+            map.put("teacherName", person.getName());
+            map.put("dept", person.getDept());
+            map.put("email", person.getEmail());
+            map.put("phone", person.getPhone());
+        }
+        map.put("title", teacher.getTitle());
+        map.put("degree", teacher.getDegree());
+        map.put("classCount", teacherClassRepository.findByTeacherPersonId(teacher.getPersonId()).size());
+        return map;
+    }
+
+    private Map<String, Object> teacherClassToMap(TeacherClass binding) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", binding.getId());
+        map.put("className", binding.getClassName());
+        map.put("studentCount", studentRepository.findByClassName(binding.getClassName()).size());
+        Teacher teacher = binding.getTeacher();
+        if (teacher != null) {
+            map.put("teacherId", teacher.getPersonId());
+            Person person = teacher.getPerson();
+            if (person != null) {
+                map.put("teacherNum", person.getNum());
+                map.put("teacherName", person.getName());
+                map.put("dept", person.getDept());
+            }
+        }
+        return map;
+    }
+
+    private Map<String, Object> examToAdminMap(Exam exam) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("examId", exam.getExamId());
+        map.put("title", exam.getTitle());
+        map.put("startTime", exam.getStartTime());
+        map.put("endTime", exam.getEndTime());
+        map.put("status", exam.getStatus());
+        map.put("creatorId", exam.getCreatorId());
+        map.put("createTime", exam.getCreateTime());
+        if (exam.getCourse() != null) {
+            map.put("courseId", exam.getCourse().getCourseId());
+            map.put("courseName", exam.getCourse().getName());
+            map.put("courseNum", exam.getCourse().getNum());
+        }
+        userRepository.findByPersonPersonId(exam.getCreatorId()).ifPresent(user -> {
+            map.put("creatorUserName", user.getUserName());
+            if (user.getPerson() != null) {
+                map.put("creatorName", user.getPerson().getName());
+            }
+        });
+        List<StudentExamAttempt> attempts = studentExamAttemptRepository.findByExamExamId(exam.getExamId());
+        long ended = attempts.stream().filter(a -> "ENDED".equals(a.getStatus())).count();
+        long draft = attempts.stream().filter(a -> "DRAFT".equals(a.getStatus())).count();
+        long autoEnded = attempts.stream().filter(a -> Objects.equals(a.getAutoEnded(), 1)).count();
+        map.put("attemptCount", attempts.size());
+        map.put("endedCount", ended);
+        map.put("draftCount", draft);
+        map.put("autoEndedCount", autoEnded);
+        map.put("recordCount", studentExamRecordRepository.findByExamExamId(exam.getExamId()).size());
+        return map;
+    }
+
+    private String normalizeRoleFilter(String roleName) {
+        if (roleName == null || roleName.isBlank()) {
+            return null;
+        }
+        String role = roleName.trim().toUpperCase(Locale.ROOT);
+        return role.startsWith("ROLE_") ? role : "ROLE_" + role;
+    }
+
+    private String normalizeExamStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        String normalized = status.trim().toUpperCase(Locale.ROOT);
+        if (!"DRAFT".equals(normalized) && !"OPEN".equals(normalized) && !"CLOSED".equals(normalized)) {
+            return null;
+        }
+        return normalized;
+    }
+
+    private int asInt(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.parseInt(Objects.toString(value, "0"));
+        } catch (Exception e) {
+            return 0;
+        }
     }
 }

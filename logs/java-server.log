@@ -430,3 +430,259 @@ Identify and stop the process that's listening on port 22222 or configure this a
 2026-04-30 13:07:09,435 [http-nio-22222-exec-3] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/exams,teacher_test,2026-04-30 13:07:09,0.018
 2026-04-30 13:07:09,494 [http-nio-22222-exec-5] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/exams/2/stats,teacher_test,2026-04-30 13:07:09,0.055
 2026-04-30 13:07:09,548 [http-nio-22222-exec-7] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/exams/2/stats,teacher_test,2026-04-30 13:07:09,0.052
+2026-04-30 13:13:10,662 [http-nio-22222-exec-1] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/student/exams,student_test,2026-04-30 13:13:10,0.059
+2026-04-30 13:15:39,319 [http-nio-22222-exec-8] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/exams/upload,teacher_test,2026-04-30 13:15:39,0.184
+2026-04-30 13:15:39,344 [http-nio-22222-exec-6] ERROR c.e.s.j.s.services.ExamTeacherService              - 试卷上传解析失败
+java.lang.IllegalArgumentException: JSON 试卷格式错误：startTime 不能为空
+	at cn.edu.sdu.java.server.services.ExamPaperParser.parseJson(ExamPaperParser.java:68)
+	at cn.edu.sdu.java.server.services.ExamPaperParser.parse(ExamPaperParser.java:22)
+	at cn.edu.sdu.java.server.services.ExamTeacherService.uploadExamPaper(ExamTeacherService.java:176)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:359)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:196)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:380)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:119)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:727)
+	at cn.edu.sdu.java.server.services.ExamTeacherService$$SpringCGLIB$$0.uploadExamPaper(<generated>)
+	at cn.edu.sdu.java.server.controllers.ExamTeacherController.uploadExam(ExamTeacherController.java:49)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:257)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:190)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:118)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:986)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:891)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1088)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:978)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1014)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:914)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:590)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:885)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:658)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:195)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:140)
+	at org.apache.tomcat.websocket.server.WsFilter.doFilter(WsFilter.java:51)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:164)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:140)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:110)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:164)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:140)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:108)
+	at org.springframework.security.web.FilterChainProxy.lambda$doFilterInternal$3(FilterChainProxy.java:231)
+	at org.springframework.security.web.ObservationFilterChainDecorator$FilterObservation$SimpleFilterObservation.lambda$wrap$1(ObservationFilterChainDecorator.java:479)
+	at org.springframework.security.web.ObservationFilterChainDecorator$AroundFilterObservation$SimpleAroundFilterObservation.lambda$wrap$1(ObservationFilterChainDecorator.java:340)
+	at org.springframework.security.web.ObservationFilterChainDecorator.lambda$wrapSecured$0(ObservationFilterChainDecorator.java:82)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:128)
+	at org.springframework.security.web.access.intercept.AuthorizationFilter.doFilter(AuthorizationFilter.java:101)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:126)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:120)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:131)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:85)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.authentication.AnonymousAuthenticationFilter.doFilter(AnonymousAuthenticationFilter.java:100)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter.doFilter(SecurityContextHolderAwareRequestFilter.java:179)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.savedrequest.RequestCacheAwareFilter.doFilter(RequestCacheAwareFilter.java:63)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at cn.edu.sdu.java.server.configs.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:86)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:107)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:93)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.web.filter.CorsFilter.doFilterInternal(CorsFilter.java:91)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.header.HeaderWriterFilter.doHeadersAfter(HeaderWriterFilter.java:90)
+	at org.springframework.security.web.header.HeaderWriterFilter.doFilterInternal(HeaderWriterFilter.java:75)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:82)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:69)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.doFilterInternal(WebAsyncManagerIntegrationFilter.java:62)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:227)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.session.DisableEncodeUrlFilter.doFilterInternal(DisableEncodeUrlFilter.java:42)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.wrapFilter(ObservationFilterChainDecorator.java:240)
+	at org.springframework.security.web.ObservationFilterChainDecorator$AroundFilterObservation$SimpleAroundFilterObservation.lambda$wrap$0(ObservationFilterChainDecorator.java:323)
+	at org.springframework.security.web.ObservationFilterChainDecorator$ObservationFilter.doFilter(ObservationFilterChainDecorator.java:224)
+	at org.springframework.security.web.ObservationFilterChainDecorator$VirtualFilterChain.doFilter(ObservationFilterChainDecorator.java:137)
+	at org.springframework.security.web.FilterChainProxy.doFilterInternal(FilterChainProxy.java:233)
+	at org.springframework.security.web.FilterChainProxy.doFilter(FilterChainProxy.java:191)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113)
+	at org.springframework.web.servlet.handler.HandlerMappingIntrospector.lambda$createCacheFilter$3(HandlerMappingIntrospector.java:243)
+	at org.springframework.web.filter.CompositeFilter$VirtualFilterChain.doFilter(CompositeFilter.java:113)
+	at org.springframework.web.filter.CompositeFilter.doFilter(CompositeFilter.java:74)
+	at org.springframework.security.config.annotation.web.configuration.WebMvcSecurityConfiguration$CompositeFilterChainProxy.doFilter(WebMvcSecurityConfiguration.java:238)
+	at org.springframework.web.filter.DelegatingFilterProxy.invokeDelegate(DelegatingFilterProxy.java:362)
+	at org.springframework.web.filter.DelegatingFilterProxy.doFilter(DelegatingFilterProxy.java:278)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:164)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:140)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:164)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:140)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:164)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:140)
+	at org.springframework.web.filter.ServerHttpObservationFilter.doFilterInternal(ServerHttpObservationFilter.java:114)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:164)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:140)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:164)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:140)
+	at org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:167)
+	at org.apache.catalina.core.StandardContextValve.invoke(StandardContextValve.java:90)
+	at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:483)
+	at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:115)
+	at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:93)
+	at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:74)
+	at org.apache.catalina.connector.CoyoteAdapter.service(CoyoteAdapter.java:344)
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:397)
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63)
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:905)
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1741)
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1190)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:659)
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63)
+	at java.base/java.lang.Thread.run(Thread.java:1447)
+Caused by: java.lang.IllegalArgumentException: startTime 不能为空
+	at cn.edu.sdu.java.server.services.ExamPaperParser.requireText(ExamPaperParser.java:220)
+	at cn.edu.sdu.java.server.services.ExamPaperParser.validate(ExamPaperParser.java:183)
+	at cn.edu.sdu.java.server.services.ExamPaperParser.parseJson(ExamPaperParser.java:65)
+	... 148 common frames omitted
+2026-04-30 13:15:39,351 [http-nio-22222-exec-6] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/exams/upload,teacher_test,2026-04-30 13:15:39,0.022
+2026-04-30 13:15:39,372 [http-nio-22222-exec-9] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/exams,teacher_test,2026-04-30 13:15:39,0.018
+2026-04-30 13:15:39,402 [http-nio-22222-exec-3] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/exams/6,teacher_test,2026-04-30 13:15:39,0.026
+2026-04-30 13:15:39,500 [http-nio-22222-exec-5] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/exams/6,teacher_test,2026-04-30 13:15:39,0.091
+2026-04-30 13:15:39,591 [http-nio-22222-exec-7] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/questions/12,teacher_test,2026-04-30 13:15:39,0.085
+2026-04-30 13:15:39,644 [http-nio-22222-exec-10] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/student/exams,student_test,2026-04-30 13:15:39,0.048
+2026-04-30 13:15:39,751 [http-nio-22222-exec-4] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/student/exams/6/start,student_test,2026-04-30 13:15:39,0.101
+2026-04-30 13:15:39,901 [http-nio-22222-exec-8] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/student/exams/6/draft,student_test,2026-04-30 13:15:39,0.145
+2026-04-30 13:15:39,939 [http-nio-22222-exec-2] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/student/exams/6/start,student_test,2026-04-30 13:15:39,0.033
+2026-04-30 13:15:50,046 [http-nio-22222-exec-9] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/student/exams,student_test,2026-04-30 13:15:49,0.046
+2026-04-30 13:15:50,169 [http-nio-22222-exec-3] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/student/exams/6/start,student_test,2026-04-30 13:15:50,0.113
+2026-04-30 13:16:20,600 [http-nio-22222-exec-4] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/student/exams,student_test,2026-04-30 13:16:20,0.048
+2026-04-30 13:16:20,771 [http-nio-22222-exec-8] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/student/exams/6/start,student_test,2026-04-30 13:16:20,0.158
+2026-04-30 13:16:20,923 [http-nio-22222-exec-2] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/student/exams/6/submit,student_test,2026-04-30 13:16:20,0.144
+2026-04-30 13:16:20,951 [http-nio-22222-exec-6] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/student/exams/6/draft,student_test,2026-04-30 13:16:20,0.023
+2026-04-30 13:16:20,985 [http-nio-22222-exec-1] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/student/exams/6/result,student_test,2026-04-30 13:16:20,0.032
+2026-04-30 13:16:21,079 [http-nio-22222-exec-9] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/student/scores,student_test,2026-04-30 13:16:20,0.092
+2026-04-30 13:16:21,124 [http-nio-22222-exec-3] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/exams/6/ended-attempts,teacher_test,2026-04-30 13:16:21,0.042
+2026-04-30 13:16:21,162 [http-nio-22222-exec-5] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/attempts/7/records,teacher_test,2026-04-30 13:16:21,0.035
+2026-04-30 13:16:21,381 [http-nio-22222-exec-7] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/records/21/grade,teacher_test,2026-04-30 13:16:21,0.215
+2026-04-30 13:16:21,429 [http-nio-22222-exec-10] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/exams/6/stats,teacher_test,2026-04-30 13:16:21,0.045
+2026-04-30 13:16:21,458 [http-nio-22222-exec-4] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/scores,teacher_test,2026-04-30 13:16:21,0.028
+2026-04-30 13:16:21,480 [http-nio-22222-exec-8] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/questions/12,teacher_test,2026-04-30 13:16:21,0.021
+2026-04-30 13:16:56,515 [http-nio-22222-exec-1] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/exams/upload,teacher_test,2026-04-30 13:16:56,0.175
+2026-04-30 13:16:56,712 [http-nio-22222-exec-3] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/teacher/exams/upload,teacher_test,2026-04-30 13:16:56,0.187
+2026-04-30 13:36:05,496 [background-preinit] INFO  o.h.validator.internal.util.Version                - HV000001: Hibernate Validator 8.0.2.Final
+2026-04-30 13:36:05,530 [main] INFO  c.e.s.java.server.JavaServerApplication            - Starting JavaServerApplication v1.0.1-SNAPSHOT using Java 24.0.2 with PID 20340 (D:\OES-course\JavaBackend\java-server\target\java-server-1.0.1-SNAPSHOT.jar started by muyufly in D:\OES-course\JavaBackend\java-server)
+2026-04-30 13:36:05,531 [main] INFO  c.e.s.java.server.JavaServerApplication            - No active profile set, falling back to 1 default profile: "default"
+2026-04-30 13:36:06,720 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate          - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-04-30 13:36:06,721 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate          - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-04-30 13:36:06,874 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate          - Finished Spring Data repository scanning in 132 ms. Found 17 JPA repository interfaces.
+2026-04-30 13:36:06,902 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate          - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-04-30 13:36:06,909 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate          - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-04-30 13:36:06,956 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.CourseRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,958 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.DictionaryInfoRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,960 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.ExamQuestionRelRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,960 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.ExamRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,961 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.MenuInfoRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,961 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.ModifyLogRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,961 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.PersonRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,961 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.QuestionRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,962 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.ScoreRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,962 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.StudentExamAttemptRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,962 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.StudentExamRecordRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,963 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.StudentRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,963 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.SystemInfoRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,964 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.TeacherClassRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,964 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.TeacherRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,964 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.UserRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,966 [main] INFO  o.s.d.r.c.RepositoryConfigurationExtensionSupport  - Spring Data Redis - Could not safely identify store assignment for repository candidate interface cn.edu.sdu.java.server.repositorys.UserTypeRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-04-30 13:36:06,966 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate          - Finished Spring Data repository scanning in 14 ms. Found 0 Redis repository interfaces.
+2026-04-30 13:36:07,997 [main] INFO  o.s.b.w.embedded.tomcat.TomcatWebServer            - Tomcat initialized with port 22222 (http)
+2026-04-30 13:36:08,025 [main] INFO  o.apache.coyote.http11.Http11NioProtocol           - Initializing ProtocolHandler ["http-nio-22222"]
+2026-04-30 13:36:08,028 [main] INFO  o.apache.catalina.core.StandardService             - Starting service [Tomcat]
+2026-04-30 13:36:08,028 [main] INFO  org.apache.catalina.core.StandardEngine            - Starting Servlet engine: [Apache Tomcat/10.1.34]
+2026-04-30 13:36:08,061 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/]                 - Initializing Spring embedded WebApplicationContext
+2026-04-30 13:36:08,063 [main] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext     - Root WebApplicationContext: initialization completed in 2480 ms
+2026-04-30 13:36:08,418 [main] INFO  o.hibernate.jpa.internal.util.LogHelper            - HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-04-30 13:36:08,475 [main] INFO  org.hibernate.Version                              - HHH000412: Hibernate ORM core version 6.6.5.Final
+2026-04-30 13:36:08,506 [main] INFO  o.h.c.internal.RegionFactoryInitiator              - HHH000026: Second-level cache disabled
+2026-04-30 13:36:08,693 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo                - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-04-30 13:36:08,714 [main] INFO  com.zaxxer.hikari.HikariDataSource                 - HikariPool-1 - Starting...
+2026-04-30 13:36:13,460 [main] INFO  com.zaxxer.hikari.pool.HikariPool                  - HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@4b360a82
+2026-04-30 13:36:13,470 [main] INFO  com.zaxxer.hikari.HikariDataSource                 - HikariPool-1 - Start completed.
+2026-04-30 13:36:13,511 [main] WARN  org.hibernate.orm.deprecation                      - HHH90000025: MySQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-04-30 13:36:13,524 [main] INFO  org.hibernate.orm.connections.pooling              - HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
+	Database driver: undefined/unknown
+	Database version: 8.0.35
+	Autocommit mode: undefined/unknown
+	Isolation level: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-04-30 13:36:14,271 [main] INFO  o.h.e.t.j.p.i.JtaPlatformInitiator                 - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-04-30 13:36:14,469 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean     - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-04-30 13:36:14,942 [main] INFO  o.s.d.j.r.query.QueryEnhancerFactory               - Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-04-30 13:36:15,764 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-04-30 13:36:16,367 [main] INFO  o.s.s.c.a.a.c.InitializeAuthenticationProviderBeanManagerConfigurer$InitializeAuthenticationProviderManagerConfigurer - Global AuthenticationManager configured with AuthenticationProvider bean with name authenticationProvider
+2026-04-30 13:36:16,376 [main] WARN  o.s.s.c.a.a.c.InitializeUserDetailsBeanManagerConfigurer$InitializeUserDetailsManagerConfigurer - Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used by Spring Security for automatically configuring username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider. If the current configuration is intentional, to turn off this warning, increase the logging level of 'org.springframework.security.config.annotation.authentication.configuration.InitializeUserDetailsBeanManagerConfigurer' to ERROR
+2026-04-30 13:36:16,831 [main] INFO  o.s.b.a.w.s.WelcomePageHandlerMapping              - Adding welcome page: class path resource [public/index.html]
+2026-04-30 13:36:17,373 [main] INFO  o.s.b.a.e.web.EndpointLinksResolver                - Exposing 1 endpoint beneath base path '/actuator'
+2026-04-30 13:36:17,853 [main] INFO  o.apache.coyote.http11.Http11NioProtocol           - Starting ProtocolHandler ["http-nio-22222"]
+2026-04-30 13:36:17,866 [main] INFO  o.s.b.w.embedded.tomcat.TomcatWebServer            - Tomcat started on port 22222 (http) with context path '/'
+2026-04-30 13:36:17,879 [main] INFO  c.e.s.java.server.JavaServerApplication            - Started JavaServerApplication in 12.976 seconds (process running for 13.527)
+2026-04-30 13:36:17,933 [main] INFO  c.e.s.j.server.SystemApplicationListener           - org.springframework.boot.context.event.ApplicationReadyEvent[source=org.springframework.boot.SpringApplication@77320275]
+2026-04-30 13:36:17,934 [main] INFO  c.e.s.j.server.SystemApplicationListener           - SystemInitStart
+2026-04-30 13:36:18,056 [main] INFO  c.e.s.j.server.SystemApplicationListener           - systemInitEnd
+2026-04-30 13:36:33,669 [http-nio-22222-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/]                 - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-04-30 13:36:33,671 [http-nio-22222-exec-1] INFO  o.s.web.servlet.DispatcherServlet                  - Initializing Servlet 'dispatcherServlet'
+2026-04-30 13:36:33,673 [http-nio-22222-exec-1] INFO  o.s.web.servlet.DispatcherServlet                  - Completed initialization in 1 ms
+2026-04-30 13:36:51,202 [http-nio-22222-exec-7] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/admin/overview,admin_test,2026-04-30 13:36:51,0.144
+2026-04-30 13:36:51,259 [http-nio-22222-exec-8] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/admin/users,admin_test,2026-04-30 13:36:51,0.052
+2026-04-30 13:36:51,299 [http-nio-22222-exec-9] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/admin/teachers,admin_test,2026-04-30 13:36:51,0.038
+2026-04-30 13:36:51,340 [http-nio-22222-exec-10] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/admin/classes,admin_test,2026-04-30 13:36:51,0.04
+2026-04-30 13:36:51,378 [http-nio-22222-exec-1] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/admin/teacher-classes,admin_test,2026-04-30 13:36:51,0.036
+2026-04-30 13:36:51,498 [http-nio-22222-exec-2] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/admin/exams,admin_test,2026-04-30 13:36:51,0.118
+2026-04-30 13:36:51,535 [http-nio-22222-exec-3] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/admin/scores/all,admin_test,2026-04-30 13:36:51,0.035
+2026-04-30 13:36:51,589 [http-nio-22222-exec-4] INFO  c.e.s.j.s.c.JwtAuthenticationFilter                - /api/admin/exams/8/status,admin_test,2026-04-30 13:36:51,0.045

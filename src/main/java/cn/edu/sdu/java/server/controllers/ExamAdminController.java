@@ -22,6 +22,57 @@ public class ExamAdminController {
         this.examAdminService = examAdminService;
     }
 
+    @GetMapping("/overview")
+    @RequireRole("ADMIN")
+    public DataResponse getOverview() {
+        return examAdminService.getOverview();
+    }
+
+    @GetMapping("/users")
+    @RequireRole("ADMIN")
+    public DataResponse getUsers(@RequestParam(required = false) String keyword,
+                                 @RequestParam(required = false) String roleName) {
+        return examAdminService.getUsers(keyword, roleName);
+    }
+
+    @GetMapping("/teachers")
+    @RequireRole("ADMIN")
+    public DataResponse getTeachers(@RequestParam(required = false) String keyword) {
+        return examAdminService.getTeachers(keyword);
+    }
+
+    @GetMapping("/classes")
+    @RequireRole("ADMIN")
+    public DataResponse getClasses() {
+        return examAdminService.getClasses();
+    }
+
+    @GetMapping("/teacher-classes")
+    @RequireRole("ADMIN")
+    public DataResponse getTeacherClasses(@RequestParam(required = false) Integer teacherId) {
+        return examAdminService.getTeacherClasses(teacherId);
+    }
+
+    @DeleteMapping("/teacher-classes/{id}")
+    @RequireRole("ADMIN")
+    public DataResponse deleteTeacherClass(@PathVariable Integer id) {
+        return examAdminService.deleteTeacherClass(id);
+    }
+
+    @GetMapping("/exams")
+    @RequireRole("ADMIN")
+    public DataResponse getExams(@RequestParam(required = false) String keyword,
+                                 @RequestParam(required = false) String status) {
+        return examAdminService.getExams(keyword, status);
+    }
+
+    @PutMapping("/exams/{examId}/status")
+    @RequireRole("ADMIN")
+    public DataResponse updateExamStatus(@PathVariable Integer examId,
+                                         @Valid @RequestBody DataRequest dataRequest) {
+        return examAdminService.updateExamStatus(examId, dataRequest.getString("status"));
+    }
+
     /**
      * 修改用户的系统权限
      * PUT /api/admin/users/{userId}/role
