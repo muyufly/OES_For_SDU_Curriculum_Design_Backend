@@ -44,6 +44,20 @@ public class ExamStudentController {
         return examStudentService.getExamQuestions(examId);
     }
 
+    @PostMapping("/{examId}/start")
+    @RequireRole("STUDENT")
+    public DataResponse startExam(@PathVariable Integer examId) {
+        return examStudentService.startExam(examId);
+    }
+
+    @PostMapping("/{examId}/draft")
+    @RequireRole("STUDENT")
+    public DataResponse saveDraft(@PathVariable Integer examId,
+                                  @Valid @RequestBody DataRequest dataRequest) {
+        List<?> answers = dataRequest.getList("answers");
+        return examStudentService.saveDraft(examId, answers);
+    }
+
     /**
      * 提交试卷作答内容
      * POST /api/student/exams/{examId}/submit

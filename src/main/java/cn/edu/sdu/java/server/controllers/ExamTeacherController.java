@@ -81,6 +81,24 @@ public class ExamTeacherController {
         return examTeacherService.getExamRecords(examId);
     }
 
+    @GetMapping("/exams/{examId}/ended-attempts")
+    @RequireRole("TEACHER")
+    public DataResponse getEndedAttempts(@PathVariable Integer examId) {
+        return examTeacherService.getEndedAttempts(examId);
+    }
+
+    @GetMapping("/attempts/{attemptId}/records")
+    @RequireRole("TEACHER")
+    public DataResponse getAttemptRecords(@PathVariable Integer attemptId) {
+        return examTeacherService.getAttemptRecords(attemptId);
+    }
+
+    @GetMapping("/exams/{examId}/stats")
+    @RequireRole("TEACHER")
+    public DataResponse getExamStats(@PathVariable Integer examId) {
+        return examTeacherService.getExamStats(examId);
+    }
+
     @GetMapping("/scores")
     @RequireRole("TEACHER")
     public DataResponse getTeacherScores(@RequestParam(required = false) Integer examId,

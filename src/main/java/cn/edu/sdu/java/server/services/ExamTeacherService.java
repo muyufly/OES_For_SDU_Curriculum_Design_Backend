@@ -30,6 +30,7 @@ public class ExamTeacherService {
     private final CourseRepository courseRepository;
     private final QuestionRepository questionRepository;
     private final ExamQuestionRelRepository examQuestionRelRepository;
+    private final StudentExamAttemptRepository studentExamAttemptRepository;
     private final ExamPaperParser examPaperParser = new ExamPaperParser();
 
     public ExamTeacherService(TeacherClassRepository teacherClassRepository,
@@ -39,7 +40,8 @@ public class ExamTeacherService {
                               ScoreRepository scoreRepository,
                               CourseRepository courseRepository,
                               QuestionRepository questionRepository,
-                              ExamQuestionRelRepository examQuestionRelRepository) {
+                              ExamQuestionRelRepository examQuestionRelRepository,
+                              StudentExamAttemptRepository studentExamAttemptRepository) {
         this.teacherClassRepository = teacherClassRepository;
         this.studentRepository = studentRepository;
         this.studentExamRecordRepository = studentExamRecordRepository;
@@ -48,6 +50,7 @@ public class ExamTeacherService {
         this.courseRepository = courseRepository;
         this.questionRepository = questionRepository;
         this.examQuestionRelRepository = examQuestionRelRepository;
+        this.studentExamAttemptRepository = studentExamAttemptRepository;
     }
 
     public DataResponse getTeacherExams() {
@@ -229,6 +232,112 @@ public class ExamTeacherService {
         return CommonMethod.getReturnData(result);
     }
 
+    public DataResponse getEndedAttempts(Integer examId) {
+        Optional<Exam> examOp = examRepository.findById(examId);
+        if (examOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("试卷不存在");
+        }
+        if (!ownsExam(examOp.get())) {
+            return CommonMethod.getReturnMessageError("无权查看该试卷");
+        }
+        ensureLegacyAttempts(examId);
+        closeExpiredDrafts(examId);
+        Set<Integer> managedStudentIds = getManagedStudentIds();
+        List<Map<String, Object>> result = studentExamAttemptRepository.findByExamExamIdAndStatus(examId, "ENDED")
+                .stream()
+                .filter(attempt -> managedStudentIds.contains(attempt.getStudent().getPersonId()))
+                .map(this::attemptToMap)
+                .collect(Collectors.toList());
+        return CommonMethod.getReturnData(result);
+    }
+
+    public DataResponse getAttemptRecords(Integer attemptId) {
+        Optional<StudentExamAttempt> attemptOp = studentExamAttemptRepository.findById(attemptId);
+        if (attemptOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("考试记录不存在");
+        }
+        StudentExamAttempt attempt = attemptOp.get();
+        closeExpiredDrafts(attempt.getExam().getExamId());
+        if (!"ENDED".equals(attempt.getStatus())) {
+            return CommonMethod.getReturnMessageError("只能批改已结束试卷");
+        }
+        if (!ownsExam(attempt.getExam()) || !getManagedStudentIds().contains(attempt.getStudent().getPersonId())) {
+            return CommonMethod.getReturnMessageError("无权查看该记录");
+        }
+        List<Map<String, Object>> result = studentExamRecordRepository
+                .findByStudentPersonIdAndExamExamId(attempt.getStudent().getPersonId(), attempt.getExam().getExamId())
+                .stream()
+                .map(this::recordToMap)
+                .collect(Collectors.toList());
+        return CommonMethod.getReturnData(result);
+    }
+
+    public DataResponse getExamStats(Integer examId) {
+        Optional<Exam> examOp = examRepository.findById(examId);
+        if (examOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("试卷不存在");
+        }
+        if (!ownsExam(examOp.get())) {
+            return CommonMethod.getReturnMessageError("无权查看该试卷统计");
+        }
+        ensureLegacyAttempts(examId);
+        closeExpiredDrafts(examId);
+        Set<Integer> managedStudentIds = getManagedStudentIds();
+        List<StudentExamAttempt> attempts = studentExamAttemptRepository.findByExamExamIdAndStudentPersonIdIn(examId, new ArrayList<>(managedStudentIds));
+        Map<Integer, StudentExamAttempt> attemptByStudent = attempts.stream()
+                .collect(Collectors.toMap(a -> a.getStudent().getPersonId(), a -> a, (a, b) -> a));
+        int endedCount = 0;
+        int draftCount = 0;
+        int gradedCount = 0;
+        int pendingGradeCount = 0;
+        int maxScore = 0;
+        int minScore = 0;
+        int scoreSum = 0;
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Integer studentId : managedStudentIds) {
+            Student student = studentRepository.findById(studentId).orElse(null);
+            if (student == null) continue;
+            StudentExamAttempt attempt = attemptByStudent.get(studentId);
+            Map<String, Object> row = studentToMap(student);
+            row.put("examId", examId);
+            if (attempt == null) {
+                row.put("studentExamStatus", "未交");
+                rows.add(row);
+                continue;
+            }
+            String status = "ENDED".equals(attempt.getStatus()) ? "已结束" : "草稿";
+            row.put("attemptId", attempt.getAttemptId());
+            row.put("studentExamStatus", status);
+            row.put("submitTime", attempt.getSubmitTime());
+            if ("ENDED".equals(attempt.getStatus())) {
+                endedCount++;
+                List<StudentExamRecord> records = studentExamRecordRepository.findByStudentPersonIdAndExamExamId(studentId, examId);
+                int total = records.stream().mapToInt(r -> r.getScore() == null ? 0 : r.getScore()).sum();
+                boolean allGraded = records.stream().allMatch(r -> r.getGraded() == 1);
+                row.put("totalScore", total);
+                row.put("allGraded", allGraded);
+                scoreSum += total;
+                maxScore = endedCount == 1 ? total : Math.max(maxScore, total);
+                minScore = endedCount == 1 ? total : Math.min(minScore, total);
+                if (allGraded) gradedCount++; else pendingGradeCount++;
+            } else {
+                draftCount++;
+            }
+            rows.add(row);
+        }
+        Map<String, Object> data = new HashMap<>();
+        data.put("averageScore", endedCount == 0 ? 0 : Math.round(scoreSum * 100.0 / endedCount) / 100.0);
+        data.put("maxScore", endedCount == 0 ? 0 : maxScore);
+        data.put("minScore", endedCount == 0 ? 0 : minScore);
+        data.put("submittedCount", endedCount);
+        data.put("notSubmittedCount", Math.max(0, managedStudentIds.size() - attempts.size()));
+        data.put("draftCount", draftCount);
+        data.put("gradedCount", gradedCount);
+        data.put("pendingGradeCount", pendingGradeCount);
+        data.put("rows", rows);
+        return CommonMethod.getReturnData(data);
+    }
+
     public DataResponse getTeacherScores(Integer examId, String className, String keyword) {
         Set<Integer> managedStudentIds = getManagedStudentIds();
         List<Map<String, Object>> result = new ArrayList<>();
@@ -304,6 +413,11 @@ public class ExamTeacherService {
             return CommonMethod.getReturnMessageError("答题记录不存在");
         }
         StudentExamRecord record = recordOp.get();
+        Optional<StudentExamAttempt> attemptOp = studentExamAttemptRepository
+                .findByStudentPersonIdAndExamExamId(record.getStudent().getPersonId(), record.getExam().getExamId());
+        if (attemptOp.isEmpty() || !"ENDED".equals(attemptOp.get().getStatus())) {
+            return CommonMethod.getReturnMessageError("只能批改已结束试卷");
+        }
         if (!getManagedStudentIds().contains(record.getStudent().getPersonId())) {
             return CommonMethod.getReturnMessageError("无权批改该学生记录");
         }
@@ -388,6 +502,93 @@ public class ExamTeacherService {
     private boolean ownsExam(Exam exam) {
         Integer teacherId = CommonMethod.getPersonId();
         return teacherId != null && exam.getCreatorId() != null && exam.getCreatorId().equals(teacherId);
+    }
+
+    private void closeExpiredDrafts(Integer examId) {
+        Optional<Exam> examOp = examRepository.findById(examId);
+        if (examOp.isEmpty() || !isAfterEnd(examOp.get())) {
+            return;
+        }
+        for (StudentExamAttempt attempt : studentExamAttemptRepository.findByExamExamIdAndStatus(examId, "DRAFT")) {
+            finalizeExpiredAttempt(attempt);
+        }
+    }
+
+    private void ensureLegacyAttempts(Integer examId) {
+        Map<Integer, List<StudentExamRecord>> groups = studentExamRecordRepository.findByExamExamId(examId).stream()
+                .collect(Collectors.groupingBy(r -> r.getStudent().getPersonId()));
+        for (Map.Entry<Integer, List<StudentExamRecord>> entry : groups.entrySet()) {
+            Integer studentId = entry.getKey();
+            if (studentExamAttemptRepository.findByStudentPersonIdAndExamExamId(studentId, examId).isPresent()) {
+                continue;
+            }
+            List<StudentExamRecord> records = entry.getValue();
+            StudentExamAttempt attempt = new StudentExamAttempt();
+            attempt.setStudent(records.get(0).getStudent());
+            attempt.setExam(records.get(0).getExam());
+            attempt.setStatus("ENDED");
+            attempt.setStartTime(records.get(0).getSubmitTime());
+            attempt.setLastSaveTime(records.get(0).getSubmitTime());
+            attempt.setSubmitTime(records.get(0).getSubmitTime());
+            attempt.setAutoEnded(0);
+            studentExamAttemptRepository.save(attempt);
+        }
+    }
+
+    private void finalizeExpiredAttempt(StudentExamAttempt attempt) {
+        for (ExamQuestionRel rel : examQuestionRelRepository.findByExamExamIdOrderBySortOrderAsc(attempt.getExam().getExamId())) {
+            Question question = rel.getQuestion();
+            StudentExamRecord record = studentExamRecordRepository
+                    .findByStudentPersonIdAndExamExamIdAndQuestionQuestionId(attempt.getStudent().getPersonId(), attempt.getExam().getExamId(), question.getQuestionId())
+                    .orElseGet(() -> {
+                        StudentExamRecord r = new StudentExamRecord();
+                        r.setStudent(attempt.getStudent());
+                        r.setExam(attempt.getExam());
+                        r.setQuestion(question);
+                        r.setAnswer("");
+                        return r;
+                    });
+            if ("CHOICE".equals(question.getQuestionType())) {
+                record.setScore(record.getAnswer() != null && record.getAnswer().equalsIgnoreCase(question.getAnswer()) ? question.getScore() : 0);
+                record.setGraded(1);
+            } else {
+                record.setScore(record.getScore() == null ? 0 : record.getScore());
+                record.setGraded(0);
+            }
+            record.setSubmitTime(DateTimeTool.parseDateTime(new Date()));
+            studentExamRecordRepository.save(record);
+        }
+        attempt.setStatus("ENDED");
+        attempt.setAutoEnded(1);
+        attempt.setSubmitTime(attempt.getSubmitTime() == null ? DateTimeTool.parseDateTime(new Date()) : attempt.getSubmitTime());
+        attempt.setLastSaveTime(DateTimeTool.parseDateTime(new Date()));
+        studentExamAttemptRepository.save(attempt);
+    }
+
+    private boolean isAfterEnd(Exam exam) {
+        try {
+            java.time.LocalDateTime end = java.time.LocalDateTime.parse(exam.getEndTime().trim(), java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            return !java.time.LocalDateTime.now().isBefore(end);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private Map<String, Object> attemptToMap(StudentExamAttempt attempt) {
+        List<StudentExamRecord> records = studentExamRecordRepository
+                .findByStudentPersonIdAndExamExamId(attempt.getStudent().getPersonId(), attempt.getExam().getExamId());
+        int total = records.stream().mapToInt(r -> r.getScore() == null ? 0 : r.getScore()).sum();
+        boolean allGraded = records.stream().allMatch(r -> r.getGraded() == 1);
+        Map<String, Object> map = studentToMap(attempt.getStudent());
+        map.put("attemptId", attempt.getAttemptId());
+        map.put("examId", attempt.getExam().getExamId());
+        map.put("examTitle", attempt.getExam().getTitle());
+        map.put("studentExamStatus", "已结束");
+        map.put("totalScore", total);
+        map.put("allGraded", allGraded);
+        map.put("submitTime", attempt.getSubmitTime());
+        map.put("autoEnded", attempt.getAutoEnded());
+        return map;
     }
 
     private Set<Integer> getManagedStudentIds() {

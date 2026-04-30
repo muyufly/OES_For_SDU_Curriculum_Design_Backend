@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface StudentExamRecordRepository extends JpaRepository<StudentExamRecord, Integer> {
@@ -19,6 +20,8 @@ public interface StudentExamRecordRepository extends JpaRepository<StudentExamRe
      * 根据考试ID查找所有作答记录
      */
     List<StudentExamRecord> findByExamExamId(Integer examId);
+
+    Optional<StudentExamRecord> findByStudentPersonIdAndExamExamIdAndQuestionQuestionId(Integer personId, Integer examId, Integer questionId);
 
     /**
      * 查询某个学生是否已提交过某场考试
