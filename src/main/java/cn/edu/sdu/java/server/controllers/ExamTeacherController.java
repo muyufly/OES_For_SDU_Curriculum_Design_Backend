@@ -32,6 +32,12 @@ public class ExamTeacherController {
         return examTeacherService.getTeacherExams();
     }
 
+    @GetMapping("/ai/providers")
+    @RequireRole("TEACHER")
+    public DataResponse getAiProviders() {
+        return examTeacherService.getAiProviders();
+    }
+
     @PostMapping(value = "/exams/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @RequireRole("TEACHER")
     public DataResponse uploadExam(@RequestParam("file") MultipartFile file,
@@ -128,6 +134,20 @@ public class ExamTeacherController {
                                     @Valid @RequestBody DataRequest dataRequest) {
         Integer score = dataRequest.getInteger("score");
         return examTeacherService.gradeRecord(recordId, score);
+    }
+
+    @PostMapping("/records/{recordId}/ai-grade")
+    @RequireRole("TEACHER")
+    public DataResponse suggestAiGrade(@PathVariable Integer recordId,
+                                       @Valid @RequestBody DataRequest dataRequest) {
+        return examTeacherService.suggestAiGrade(recordId, dataRequest.getString("provider"));
+    }
+
+    @PostMapping("/records/{recordId}/ai-grade/apply")
+    @RequireRole("TEACHER")
+    public DataResponse applyAiGrade(@PathVariable Integer recordId,
+                                     @Valid @RequestBody DataRequest dataRequest) {
+        return examTeacherService.applyAiGrade(recordId, dataRequest.getString("provider"));
     }
 
     /**

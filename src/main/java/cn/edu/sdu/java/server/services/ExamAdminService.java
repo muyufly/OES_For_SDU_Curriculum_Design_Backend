@@ -3,6 +3,7 @@ package cn.edu.sdu.java.server.services;
 import cn.edu.sdu.java.server.models.*;
 import cn.edu.sdu.java.server.payload.response.DataResponse;
 import cn.edu.sdu.java.server.repositorys.*;
+import cn.edu.sdu.java.server.services.ai.AiGradingService;
 import cn.edu.sdu.java.server.util.CommonMethod;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -28,6 +29,7 @@ public class ExamAdminService {
     private final CourseRepository courseRepository;
     private final StudentExamAttemptRepository studentExamAttemptRepository;
     private final StudentExamRecordRepository studentExamRecordRepository;
+    private final AiGradingService aiGradingService;
 
     public ExamAdminService(UserRepository userRepository,
                             UserTypeRepository userTypeRepository,
@@ -38,7 +40,8 @@ public class ExamAdminService {
                             ExamRepository examRepository,
                             CourseRepository courseRepository,
                             StudentExamAttemptRepository studentExamAttemptRepository,
-                            StudentExamRecordRepository studentExamRecordRepository) {
+                            StudentExamRecordRepository studentExamRecordRepository,
+                            AiGradingService aiGradingService) {
         this.userRepository = userRepository;
         this.userTypeRepository = userTypeRepository;
         this.teacherRepository = teacherRepository;
@@ -49,6 +52,28 @@ public class ExamAdminService {
         this.courseRepository = courseRepository;
         this.studentExamAttemptRepository = studentExamAttemptRepository;
         this.studentExamRecordRepository = studentExamRecordRepository;
+        this.aiGradingService = aiGradingService;
+    }
+
+    public DataResponse getAiProviders() {
+        return CommonMethod.getReturnData(aiGradingService.listAdminProviders());
+    }
+
+    public DataResponse saveAiProvider(Integer id, Map<String, Object> form) {
+        try {
+            return CommonMethod.getReturnData(aiGradingService.saveProvider(id, form), "AI API配置已保存");
+        } catch (Exception e) {
+            return CommonMethod.getReturnMessageError(e.getMessage());
+        }
+    }
+
+    public DataResponse deleteAiProvider(Integer id) {
+        try {
+            aiGradingService.deleteProvider(id);
+            return CommonMethod.getReturnMessageOK("AI API配置已删除");
+        } catch (Exception e) {
+            return CommonMethod.getReturnMessageError(e.getMessage());
+        }
     }
 
     public DataResponse getOverview() {

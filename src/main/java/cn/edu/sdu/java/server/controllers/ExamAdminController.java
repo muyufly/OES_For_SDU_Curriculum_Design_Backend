@@ -28,6 +28,31 @@ public class ExamAdminController {
         return examAdminService.getOverview();
     }
 
+    @GetMapping("/ai/providers")
+    @RequireRole("ADMIN")
+    public DataResponse getAiProviders() {
+        return examAdminService.getAiProviders();
+    }
+
+    @PostMapping("/ai/providers")
+    @RequireRole("ADMIN")
+    public DataResponse createAiProvider(@Valid @RequestBody DataRequest dataRequest) {
+        return examAdminService.saveAiProvider(null, dataRequest.getMap("provider"));
+    }
+
+    @PutMapping("/ai/providers/{id}")
+    @RequireRole("ADMIN")
+    public DataResponse updateAiProvider(@PathVariable Integer id,
+                                         @Valid @RequestBody DataRequest dataRequest) {
+        return examAdminService.saveAiProvider(id, dataRequest.getMap("provider"));
+    }
+
+    @DeleteMapping("/ai/providers/{id}")
+    @RequireRole("ADMIN")
+    public DataResponse deleteAiProvider(@PathVariable Integer id) {
+        return examAdminService.deleteAiProvider(id);
+    }
+
     @GetMapping("/users")
     @RequireRole("ADMIN")
     public DataResponse getUsers(@RequestParam(required = false) String keyword,

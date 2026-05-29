@@ -4,6 +4,8 @@ import cn.edu.sdu.java.server.models.*;
 import cn.edu.sdu.java.server.payload.request.DataRequest;
 import cn.edu.sdu.java.server.payload.response.DataResponse;
 import cn.edu.sdu.java.server.repositorys.*;
+import cn.edu.sdu.java.server.services.ai.AiGradeResult;
+import cn.edu.sdu.java.server.services.ai.AiGradingService;
 import cn.edu.sdu.java.server.util.CommonMethod;
 import cn.edu.sdu.java.server.util.DateTimeTool;
 import jakarta.servlet.http.HttpServletResponse;
@@ -31,6 +33,7 @@ public class ExamTeacherService {
     private final QuestionRepository questionRepository;
     private final ExamQuestionRelRepository examQuestionRelRepository;
     private final StudentExamAttemptRepository studentExamAttemptRepository;
+    private final AiGradingService aiGradingService;
     private final ExamPaperParser examPaperParser = new ExamPaperParser();
 
     public ExamTeacherService(TeacherClassRepository teacherClassRepository,
@@ -41,7 +44,8 @@ public class ExamTeacherService {
                               CourseRepository courseRepository,
                               QuestionRepository questionRepository,
                               ExamQuestionRelRepository examQuestionRelRepository,
-                              StudentExamAttemptRepository studentExamAttemptRepository) {
+                              StudentExamAttemptRepository studentExamAttemptRepository,
+                              AiGradingService aiGradingService) {
         this.teacherClassRepository = teacherClassRepository;
         this.studentRepository = studentRepository;
         this.studentExamRecordRepository = studentExamRecordRepository;
@@ -51,6 +55,11 @@ public class ExamTeacherService {
         this.questionRepository = questionRepository;
         this.examQuestionRelRepository = examQuestionRelRepository;
         this.studentExamAttemptRepository = studentExamAttemptRepository;
+        this.aiGradingService = aiGradingService;
+    }
+
+    public DataResponse getAiProviders() {
+        return CommonMethod.getReturnData(aiGradingService.listProviders());
     }
 
     public DataResponse getTeacherExams() {
@@ -443,6 +452,65 @@ public class ExamTeacherService {
             syncToScoreTable(personId, record.getExam(), totalScore);
         }
         return CommonMethod.getReturnMessageOK("批阅成功");
+    }
+
+    public DataResponse suggestAiGrade(Integer recordId, String providerName) {
+        Optional<StudentExamRecord> recordOp = studentExamRecordRepository.findById(recordId);
+        if (recordOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("答题记录不存在");
+        }
+        StudentExamRecord record = recordOp.get();
+        String validation = validateAiGradeAccess(record);
+        if (validation != null) {
+            return CommonMethod.getReturnMessageError(validation);
+        }
+        try {
+            AiGradeResult result = aiGradingService.grade(record, providerName);
+            Map<String, Object> data = result.toMap();
+            data.put("recordId", recordId);
+            data.put("maxScore", record.getQuestion().getScore());
+            return CommonMethod.getReturnData(data);
+        } catch (Exception e) {
+            log.error("AI grading failed, recordId={}", recordId, e);
+            return CommonMethod.getReturnMessageError("AI批改失败：" + e.getMessage());
+        }
+    }
+
+    public DataResponse applyAiGrade(Integer recordId, String providerName) {
+        DataResponse suggestion = suggestAiGrade(recordId, providerName);
+        if (suggestion.getCode() != 0 || !(suggestion.getData() instanceof Map<?, ?> data)) {
+            return suggestion;
+        }
+        Object scoreValue = data.get("score");
+        Integer score = null;
+        if (scoreValue instanceof Number number) {
+            score = number.intValue();
+        } else if (scoreValue != null) {
+            try {
+                score = (int) Double.parseDouble(scoreValue.toString());
+            } catch (Exception ignored) {
+            }
+        }
+        DataResponse gradeResponse = gradeRecord(recordId, score);
+        if (gradeResponse.getCode() != 0) {
+            return gradeResponse;
+        }
+        return CommonMethod.getReturnData(data, "AI批改已应用");
+    }
+
+    private String validateAiGradeAccess(StudentExamRecord record) {
+        Optional<StudentExamAttempt> attemptOp = studentExamAttemptRepository
+                .findByStudentPersonIdAndExamExamId(record.getStudent().getPersonId(), record.getExam().getExamId());
+        if (attemptOp.isEmpty() || !"ENDED".equals(attemptOp.get().getStatus())) {
+            return "只能批改已结束试卷";
+        }
+        if (!ownsExam(record.getExam()) || !getManagedStudentIds().contains(record.getStudent().getPersonId())) {
+            return "无权批改该学生记录";
+        }
+        if (!"READ".equals(record.getQuestion().getQuestionType())) {
+            return "AI批改仅用于主观题";
+        }
+        return null;
     }
 
     private void syncToScoreTable(Integer personId, Exam exam, int totalScore) {

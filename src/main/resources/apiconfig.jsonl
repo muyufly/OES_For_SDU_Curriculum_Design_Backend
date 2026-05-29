@@ -1,0 +1,4 @@
+{"name":"mock","provider":"mock","enabled":true,"model":"local-keyword-rubric"}
+{"name":"openai","provider":"openai","enabled":false,"endpoint":"https://api.openai.com/v1/chat/completions","apiKeyEnv":"OPENAI_API_KEY","model":"gpt-4o-mini","temperature":0.0,"maxTokens":500,"timeoutSeconds":30}
+{"name":"deepseek","provider":"deepseek","enabled":false,"endpoint":"https://api.deepseek.com/chat/completions","apiKeyEnv":"DEEPSEEK_API_KEY","model":"deepseek-chat","temperature":0.0,"maxTokens":500,"timeoutSeconds":30}
+{"name":"custom-compatible","provider":"custom","enabled":false,"endpoint":"https://example.com/v1/chat/completions","apiKeyEnv":"CUSTOM_AI_API_KEY","model":"custom-model","temperature":0.0,"maxTokens":500,"timeoutSeconds":30}
