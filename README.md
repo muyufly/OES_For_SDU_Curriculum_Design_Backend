@@ -1,4 +1,4 @@
-# OES Backend README
+# OES Backend
 
 OES 后端是基于 Spring Boot 3 和 Java 21 的在线考试系统服务端，负责认证授权、课程/班级/人员管理、考试会话、试卷导入、成绩统计以及 AI 辅助批改等能力。
 
