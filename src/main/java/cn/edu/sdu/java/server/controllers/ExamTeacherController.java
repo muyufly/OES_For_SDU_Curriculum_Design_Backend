@@ -150,6 +150,19 @@ public class ExamTeacherController {
         return examTeacherService.applyAiGrade(recordId, dataRequest.getString("provider"));
     }
 
+    @PostMapping("/exams/{examId}/ai-grade/pending")
+    @RequireRole("TEACHER")
+    public DataResponse applyAiGradeForExam(@PathVariable Integer examId,
+                                            @Valid @RequestBody DataRequest dataRequest) {
+        return examTeacherService.applyPendingAiGrades(examId, dataRequest.getString("provider"));
+    }
+
+    @PostMapping("/ai-grade/pending")
+    @RequireRole("TEACHER")
+    public DataResponse applyAiGradeForAllPending(@Valid @RequestBody DataRequest dataRequest) {
+        return examTeacherService.applyPendingAiGrades(null, dataRequest.getString("provider"));
+    }
+
     /**
      * 导出当前考试的成绩单（CSV 格式）
      * GET /api/teacher/exams/{examId}/export

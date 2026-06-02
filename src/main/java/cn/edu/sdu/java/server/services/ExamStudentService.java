@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -18,7 +17,6 @@ import java.util.stream.Collectors;
 public class ExamStudentService {
     private static final String ATTEMPT_DRAFT = "DRAFT";
     private static final String ATTEMPT_ENDED = "ENDED";
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final ExamRepository examRepository;
     private final ExamQuestionRelRepository examQuestionRelRepository;
@@ -69,6 +67,9 @@ public class ExamStudentService {
             return CommonMethod.getReturnMessageError("考试不存在");
         }
         Exam exam = examOp.get();
+        if (parseTime(exam.getStartTime()) == null || parseTime(exam.getEndTime()) == null) {
+            return CommonMethod.getReturnMessageError("试卷时间格式异常，请联系教师重新保存试卷时间");
+        }
         closeExpiredDrafts(examId);
         if (!"OPEN".equals(exam.getStatus())) {
             return CommonMethod.getReturnMessageError("考试未开放");
@@ -488,11 +489,7 @@ public class ExamStudentService {
     }
 
     private LocalDateTime parseTime(String value) {
-        try {
-            return value == null || value.isBlank() ? null : LocalDateTime.parse(value.trim(), TIME_FORMATTER);
-        } catch (Exception e) {
-            return null;
-        }
+        return ExamPaperParser.parseExamTime(value);
     }
 
     private String now() {

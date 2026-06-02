@@ -26,11 +26,12 @@ public class AiProviderSetting {
     @Column(nullable = false)
     private Integer enabled;
 
-    @Size(max = 300)
+    @Size(max = 600)
+    @Column(length = 600)
     private String endpoint;
 
-    @Size(max = 120)
-    @Column(name = "api_key")
+    @Size(max = 1000)
+    @Column(name = "api_key", length = 1000)
     private String apiKey;
 
     @Size(max = 80)

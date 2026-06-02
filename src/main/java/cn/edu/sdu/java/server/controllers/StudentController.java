@@ -94,7 +94,7 @@ public class StudentController {
      *
      */
     @PostMapping("/getStudentListExcl")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<StreamingResponseBody> getStudentListExcl(@Valid @RequestBody DataRequest dataRequest) {
         return studentService.getStudentListExcl(dataRequest);
     }

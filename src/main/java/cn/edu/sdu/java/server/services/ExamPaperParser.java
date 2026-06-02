@@ -3,6 +3,9 @@ package cn.edu.sdu.java.server.services;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -14,6 +17,19 @@ public class ExamPaperParser {
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final Pattern MD_QUESTION_HEADER = Pattern.compile("^##\\s+Q\\d+\\s+\\[(CHOICE|READ)]\\s+(\\d+)\\s*$");
     private static final Pattern MD_OPTION = Pattern.compile("^([ABCD])\\.\\s*(.+)$");
+    private static final DateTimeFormatter OUTPUT_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final List<DateTimeFormatter> DATE_TIME_FORMATTERS = List.of(
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"),
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"),
+            DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"),
+            DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm")
+    );
+    private static final List<DateTimeFormatter> DATE_FORMATTERS = List.of(
+            DateTimeFormatter.ofPattern("yyyy-MM-dd"),
+            DateTimeFormatter.ofPattern("yyyy/MM/dd")
+    );
 
     public ParsedExam parse(String fileName, String content, CsvMeta csvMeta) {
         content = stripBom(content);
@@ -180,8 +196,9 @@ public class ExamPaperParser {
         if (exam.courseId == null || exam.courseId <= 0) {
             throw new IllegalArgumentException("courseId 必须为正整数");
         }
-        requireText(exam.startTime, "startTime");
-        requireText(exam.endTime, "endTime");
+        exam.startTime = normalizeStartTime(exam.startTime);
+        exam.endTime = normalizeEndTime(exam.endTime);
+        validateTimeRange(exam.startTime, exam.endTime);
         exam.status = normalizeStatus(exam.status);
         if (exam.questions.isEmpty()) {
             throw new IllegalArgumentException("试卷至少需要一道题目");
@@ -219,6 +236,58 @@ public class ExamPaperParser {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " 不能为空");
         }
+    }
+
+    public static String normalizeStartTime(String value) {
+        LocalDateTime parsed = parseExamTime(value, false);
+        if (parsed == null) {
+            throw new IllegalArgumentException("startTime 必须是有效时间，例如 yyyy-MM-dd HH:mm:ss");
+        }
+        return parsed.format(OUTPUT_TIME_FORMATTER);
+    }
+
+    public static String normalizeEndTime(String value) {
+        LocalDateTime parsed = parseExamTime(value, true);
+        if (parsed == null) {
+            throw new IllegalArgumentException("endTime 必须是有效时间，例如 yyyy-MM-dd HH:mm:ss");
+        }
+        return parsed.format(OUTPUT_TIME_FORMATTER);
+    }
+
+    public static void validateTimeRange(String startTime, String endTime) {
+        LocalDateTime start = parseExamTime(startTime, false);
+        LocalDateTime end = parseExamTime(endTime, true);
+        if (start == null || end == null) {
+            throw new IllegalArgumentException("startTime/endTime 时间格式无效");
+        }
+        if (!end.isAfter(start)) {
+            throw new IllegalArgumentException("endTime 必须晚于 startTime");
+        }
+    }
+
+    public static LocalDateTime parseExamTime(String value) {
+        return parseExamTime(value, false);
+    }
+
+    private static LocalDateTime parseExamTime(String value, boolean endOfDay) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim();
+        for (DateTimeFormatter formatter : DATE_TIME_FORMATTERS) {
+            try {
+                return LocalDateTime.parse(normalized, formatter);
+            } catch (Exception ignored) {
+            }
+        }
+        for (DateTimeFormatter formatter : DATE_FORMATTERS) {
+            try {
+                LocalDate date = LocalDate.parse(normalized, formatter);
+                return endOfDay ? date.atTime(23, 59, 59) : date.atStartOfDay();
+            } catch (Exception ignored) {
+            }
+        }
+        return null;
     }
 
     private static String normalizeType(String value) {

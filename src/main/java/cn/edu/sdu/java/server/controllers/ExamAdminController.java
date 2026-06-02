@@ -72,6 +72,25 @@ public class ExamAdminController {
         return examAdminService.getClasses();
     }
 
+    @PostMapping("/classes")
+    @RequireRole("ADMIN")
+    public DataResponse createClass(@Valid @RequestBody DataRequest dataRequest) {
+        return examAdminService.saveClass(null, dataRequest.getMap("classInfo"));
+    }
+
+    @PutMapping("/classes/{classId}")
+    @RequireRole("ADMIN")
+    public DataResponse updateClass(@PathVariable Integer classId,
+                                    @Valid @RequestBody DataRequest dataRequest) {
+        return examAdminService.saveClass(classId, dataRequest.getMap("classInfo"));
+    }
+
+    @DeleteMapping("/classes/{classId}")
+    @RequireRole("ADMIN")
+    public DataResponse deleteClass(@PathVariable Integer classId) {
+        return examAdminService.deleteClass(classId);
+    }
+
     @GetMapping("/teacher-classes")
     @RequireRole("ADMIN")
     public DataResponse getTeacherClasses(@RequestParam(required = false) Integer teacherId) {
@@ -82,6 +101,28 @@ public class ExamAdminController {
     @RequireRole("ADMIN")
     public DataResponse deleteTeacherClass(@PathVariable Integer id) {
         return examAdminService.deleteTeacherClass(id);
+    }
+
+    @GetMapping("/course-classes/students")
+    @RequireRole("ADMIN")
+    public DataResponse getCourseClassStudents(@RequestParam Integer courseId,
+                                               @RequestParam String className) {
+        return examAdminService.getCourseClassStudents(courseId, className);
+    }
+
+    @PostMapping("/course-classes/students")
+    @RequireRole("ADMIN")
+    public DataResponse assignStudentCourseClass(@Valid @RequestBody DataRequest dataRequest) {
+        return examAdminService.assignStudentCourseClass(
+                dataRequest.getInteger("studentId"),
+                dataRequest.getInteger("courseId"),
+                dataRequest.getString("className"));
+    }
+
+    @DeleteMapping("/course-classes/students/{id}")
+    @RequireRole("ADMIN")
+    public DataResponse deleteStudentCourseClass(@PathVariable Integer id) {
+        return examAdminService.deleteStudentCourseClass(id);
     }
 
     @GetMapping("/exams")
@@ -120,8 +161,9 @@ public class ExamAdminController {
     @RequireRole("ADMIN")
     public DataResponse assignTeacherClass(@Valid @RequestBody DataRequest dataRequest) {
         Integer teacherId = dataRequest.getInteger("teacherId");
+        Integer courseId = dataRequest.getInteger("courseId");
         String className = dataRequest.getString("className");
-        return examAdminService.assignTeacherClass(teacherId, className);
+        return examAdminService.assignTeacherClass(teacherId, courseId, className);
     }
 
     /**

@@ -33,6 +33,7 @@ public class ExamTeacherService {
     private final QuestionRepository questionRepository;
     private final ExamQuestionRelRepository examQuestionRelRepository;
     private final StudentExamAttemptRepository studentExamAttemptRepository;
+    private final StudentCourseClassRepository studentCourseClassRepository;
     private final AiGradingService aiGradingService;
     private final ExamPaperParser examPaperParser = new ExamPaperParser();
 
@@ -45,6 +46,7 @@ public class ExamTeacherService {
                               QuestionRepository questionRepository,
                               ExamQuestionRelRepository examQuestionRelRepository,
                               StudentExamAttemptRepository studentExamAttemptRepository,
+                              StudentCourseClassRepository studentCourseClassRepository,
                               AiGradingService aiGradingService) {
         this.teacherClassRepository = teacherClassRepository;
         this.studentRepository = studentRepository;
@@ -55,6 +57,7 @@ public class ExamTeacherService {
         this.questionRepository = questionRepository;
         this.examQuestionRelRepository = examQuestionRelRepository;
         this.studentExamAttemptRepository = studentExamAttemptRepository;
+        this.studentCourseClassRepository = studentCourseClassRepository;
         this.aiGradingService = aiGradingService;
     }
 
@@ -114,10 +117,18 @@ public class ExamTeacherService {
         if (courseOp.isEmpty()) {
             return CommonMethod.getReturnMessageError("课程不存在");
         }
+        try {
+            startTime = ExamPaperParser.normalizeStartTime(startTime);
+            endTime = ExamPaperParser.normalizeEndTime(endTime);
+            ExamPaperParser.validateTimeRange(startTime, endTime);
+        } catch (IllegalArgumentException e) {
+            log.error("试卷时间格式校验失败: startTime={}, endTime={}", startTime, endTime, e);
+            return CommonMethod.getReturnMessageError(e.getMessage());
+        }
         exam.setTitle(title.trim());
         exam.setCourse(courseOp.get());
-        exam.setStartTime(startTime.trim());
-        exam.setEndTime(endTime.trim());
+        exam.setStartTime(startTime);
+        exam.setEndTime(endTime);
         exam.setStatus(status);
         examRepository.save(exam);
         return CommonMethod.getReturnData(examToMap(exam), "试卷修改成功");
@@ -233,7 +244,7 @@ public class ExamTeacherService {
         if (!ownsExam(examOp.get())) {
             return CommonMethod.getReturnMessageError("无权查看该试卷记录");
         }
-        Set<Integer> managedStudentIds = getManagedStudentIds();
+        Set<Integer> managedStudentIds = getManagedStudentIds(examOp.get().getCourse());
         List<Map<String, Object>> result = studentExamRecordRepository.findByExamExamId(examId).stream()
                 .filter(record -> managedStudentIds.contains(record.getStudent().getPersonId()))
                 .map(this::recordToMap)
@@ -251,7 +262,7 @@ public class ExamTeacherService {
         }
         ensureLegacyAttempts(examId);
         closeExpiredDrafts(examId);
-        Set<Integer> managedStudentIds = getManagedStudentIds();
+        Set<Integer> managedStudentIds = getManagedStudentIds(examOp.get().getCourse());
         List<Map<String, Object>> result = studentExamAttemptRepository.findByExamExamIdAndStatus(examId, "ENDED")
                 .stream()
                 .filter(attempt -> managedStudentIds.contains(attempt.getStudent().getPersonId()))
@@ -270,7 +281,7 @@ public class ExamTeacherService {
         if (!"ENDED".equals(attempt.getStatus())) {
             return CommonMethod.getReturnMessageError("只能批改已结束试卷");
         }
-        if (!ownsExam(attempt.getExam()) || !getManagedStudentIds().contains(attempt.getStudent().getPersonId())) {
+        if (!ownsExam(attempt.getExam()) || !getManagedStudentIds(attempt.getExam().getCourse()).contains(attempt.getStudent().getPersonId())) {
             return CommonMethod.getReturnMessageError("无权查看该记录");
         }
         List<Map<String, Object>> result = studentExamRecordRepository
@@ -291,7 +302,7 @@ public class ExamTeacherService {
         }
         ensureLegacyAttempts(examId);
         closeExpiredDrafts(examId);
-        Set<Integer> managedStudentIds = getManagedStudentIds();
+        Set<Integer> managedStudentIds = getManagedStudentIds(examOp.get().getCourse());
         List<StudentExamAttempt> attempts = studentExamAttemptRepository.findByExamExamIdAndStudentPersonIdIn(examId, new ArrayList<>(managedStudentIds));
         Map<Integer, StudentExamAttempt> attemptByStudent = attempts.stream()
                 .collect(Collectors.toMap(a -> a.getStudent().getPersonId(), a -> a, (a, b) -> a));
@@ -348,7 +359,11 @@ public class ExamTeacherService {
     }
 
     public DataResponse getTeacherScores(Integer examId, String className, String keyword) {
-        Set<Integer> managedStudentIds = getManagedStudentIds();
+        Course scopeCourse = null;
+        if (examId != null && examId > 0) {
+            scopeCourse = examRepository.findById(examId).map(Exam::getCourse).orElse(null);
+        }
+        Set<Integer> managedStudentIds = getManagedStudentIds(scopeCourse);
         List<Map<String, Object>> result = new ArrayList<>();
         if (examId != null && examId > 0) {
             Map<Integer, List<StudentExamRecord>> groups = studentExamRecordRepository.findByExamExamId(examId).stream()
@@ -392,9 +407,8 @@ public class ExamTeacherService {
 
     public DataResponse getClassStudentExamRecords() {
         List<Map<String, Object>> resultList = new ArrayList<>();
-        List<String> classNames = getTeacherClassNames();
-        for (String cn : classNames) {
-            List<Student> students = studentRepository.findByClassName(cn);
+        for (TeacherClass binding : getTeacherBindings(null)) {
+            List<Student> students = studentsForBinding(binding);
             for (Student s : students) {
                 List<StudentExamRecord> records = studentExamRecordRepository.findByStudentPersonIdIn(List.of(s.getPersonId()));
                 Map<Integer, List<StudentExamRecord>> examGroups = records.stream()
@@ -427,7 +441,7 @@ public class ExamTeacherService {
         if (attemptOp.isEmpty() || !"ENDED".equals(attemptOp.get().getStatus())) {
             return CommonMethod.getReturnMessageError("只能批改已结束试卷");
         }
-        if (!getManagedStudentIds().contains(record.getStudent().getPersonId())) {
+        if (!getManagedStudentIds(record.getExam().getCourse()).contains(record.getStudent().getPersonId())) {
             return CommonMethod.getReturnMessageError("无权批改该学生记录");
         }
         if (!"READ".equals(record.getQuestion().getQuestionType())) {
@@ -498,13 +512,120 @@ public class ExamTeacherService {
         return CommonMethod.getReturnData(data, "AI批改已应用");
     }
 
+    public DataResponse applyPendingAiGrades(Integer examId, String providerName) {
+        List<StudentExamRecord> candidates = findPendingAiGradeRecords(examId);
+        int successCount = 0;
+        int failCount = 0;
+        List<Map<String, Object>> failures = new ArrayList<>();
+        List<Map<String, Object>> graded = new ArrayList<>();
+        for (StudentExamRecord record : candidates) {
+            try {
+                AiGradeResult result = aiGradingService.grade(record, providerName);
+                int maxScore = record.getQuestion().getScore() == null ? 0 : record.getQuestion().getScore();
+                int score = Math.max(0, Math.min(maxScore, result.getScore()));
+                record.setScore(score);
+                record.setGraded(1);
+                studentExamRecordRepository.save(record);
+                syncIfAttemptFullyGraded(record);
+                successCount++;
+
+                Map<String, Object> item = result.toMap();
+                item.put("recordId", record.getRecordId());
+                item.put("examId", record.getExam().getExamId());
+                item.put("studentId", record.getStudent().getPersonId());
+                item.put("studentName", studentDisplayName(record.getStudent()));
+                item.put("maxScore", maxScore);
+                graded.add(item);
+            } catch (Exception e) {
+                failCount++;
+                log.error("Batch AI grading failed, recordId={}", record.getRecordId(), e);
+                Map<String, Object> failure = new LinkedHashMap<>();
+                failure.put("recordId", record.getRecordId());
+                failure.put("examId", record.getExam().getExamId());
+                failure.put("studentName", studentDisplayName(record.getStudent()));
+                failure.put("reason", e.getMessage());
+                failures.add(failure);
+            }
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("scope", examId == null ? "ALL" : "EXAM");
+        data.put("examId", examId);
+        data.put("provider", providerName);
+        data.put("pendingCount", candidates.size());
+        data.put("successCount", successCount);
+        data.put("failCount", failCount);
+        data.put("graded", graded);
+        data.put("failures", failures);
+        String message = "AI批量批改完成：成功 " + successCount + " 条，失败 " + failCount + " 条";
+        return CommonMethod.getReturnData(data, message);
+    }
+
+    private List<StudentExamRecord> findPendingAiGradeRecords(Integer examId) {
+        List<StudentExamRecord> records;
+        if (examId != null && examId > 0) {
+            Optional<Exam> examOp = examRepository.findById(examId);
+            if (examOp.isEmpty() || !ownsExam(examOp.get())) {
+                return List.of();
+            }
+            ensureLegacyAttempts(examId);
+            closeExpiredDrafts(examId);
+            Set<Integer> managedStudentIds = getManagedStudentIds(examOp.get().getCourse());
+            records = studentExamRecordRepository.findByExamExamId(examId).stream()
+                    .filter(record -> managedStudentIds.contains(record.getStudent().getPersonId()))
+                    .collect(Collectors.toList());
+        } else {
+            records = new ArrayList<>();
+            for (Exam exam : examRepository.findAll()) {
+                if (!ownsExam(exam)) {
+                    continue;
+                }
+                ensureLegacyAttempts(exam.getExamId());
+                closeExpiredDrafts(exam.getExamId());
+                Set<Integer> managedStudentIds = getManagedStudentIds(exam.getCourse());
+                records.addAll(studentExamRecordRepository.findByExamExamId(exam.getExamId()).stream()
+                        .filter(record -> managedStudentIds.contains(record.getStudent().getPersonId()))
+                        .toList());
+            }
+        }
+        return records.stream()
+                .filter(record -> record.getGraded() == null || record.getGraded() == 0)
+                .filter(record -> record.getQuestion() != null && "READ".equals(record.getQuestion().getQuestionType()))
+                .filter(this::isEndedAttemptRecord)
+                .collect(Collectors.toList());
+    }
+
+    private boolean isEndedAttemptRecord(StudentExamRecord record) {
+        return studentExamAttemptRepository
+                .findByStudentPersonIdAndExamExamId(record.getStudent().getPersonId(), record.getExam().getExamId())
+                .map(attempt -> "ENDED".equals(attempt.getStatus()))
+                .orElse(false);
+    }
+
+    private void syncIfAttemptFullyGraded(StudentExamRecord record) {
+        Integer personId = record.getStudent().getPersonId();
+        Integer examId = record.getExam().getExamId();
+        List<StudentExamRecord> allRecords = studentExamRecordRepository.findByStudentPersonIdAndExamExamId(personId, examId);
+        boolean allGraded = allRecords.stream().allMatch(r -> r.getGraded() == 1);
+        if (allGraded) {
+            int totalScore = allRecords.stream().mapToInt(r -> r.getScore() == null ? 0 : r.getScore()).sum();
+            syncToScoreTable(personId, record.getExam(), totalScore);
+        }
+    }
+
+    private String studentDisplayName(Student student) {
+        if (student == null || student.getPerson() == null) {
+            return "";
+        }
+        return student.getPerson().getName();
+    }
+
     private String validateAiGradeAccess(StudentExamRecord record) {
         Optional<StudentExamAttempt> attemptOp = studentExamAttemptRepository
                 .findByStudentPersonIdAndExamExamId(record.getStudent().getPersonId(), record.getExam().getExamId());
         if (attemptOp.isEmpty() || !"ENDED".equals(attemptOp.get().getStatus())) {
             return "只能批改已结束试卷";
         }
-        if (!ownsExam(record.getExam()) || !getManagedStudentIds().contains(record.getStudent().getPersonId())) {
+        if (!ownsExam(record.getExam()) || !getManagedStudentIds(record.getExam().getCourse()).contains(record.getStudent().getPersonId())) {
             return "无权批改该学生记录";
         }
         if (!"READ".equals(record.getQuestion().getQuestionType())) {
@@ -659,25 +780,40 @@ public class ExamTeacherService {
         return map;
     }
 
-    private Set<Integer> getManagedStudentIds() {
+    private Set<Integer> getManagedStudentIds(Course course) {
         Set<Integer> ids = new HashSet<>();
-        for (String className : getTeacherClassNames()) {
-            for (Student student : studentRepository.findByClassName(className)) {
+        for (TeacherClass binding : getTeacherBindings(course)) {
+            for (Student student : studentsForBinding(binding)) {
                 ids.add(student.getPersonId());
             }
         }
         return ids;
     }
 
-    private List<String> getTeacherClassNames() {
+    private List<TeacherClass> getTeacherBindings(Course course) {
         Integer teacherId = CommonMethod.getPersonId();
         if (teacherId == null) {
             return List.of();
         }
         return teacherClassRepository.findByTeacherPersonId(teacherId).stream()
-                .map(TeacherClass::getClassName)
-                .filter(Objects::nonNull)
+                .filter(binding -> course == null || binding.getCourse() == null
+                        || binding.getCourse().getCourseId().equals(course.getCourseId()))
                 .collect(Collectors.toList());
+    }
+
+    private List<Student> studentsForBinding(TeacherClass binding) {
+        if (binding.getCourse() != null) {
+            List<Student> enrolled = studentCourseClassRepository
+                    .findByCourseCourseIdAndClassName(binding.getCourse().getCourseId(), binding.getClassName())
+                    .stream()
+                    .map(StudentCourseClass::getStudent)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            if (!enrolled.isEmpty()) {
+                return enrolled;
+            }
+        }
+        return studentRepository.findByClassName(binding.getClassName());
     }
 
     private Map<String, Object> examToMap(Exam exam) {

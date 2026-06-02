@@ -16,7 +16,7 @@ import lombok.Setter;
 @Entity
 @Table(name = "teacher_class",
         uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"teacherId", "className"})
+                @UniqueConstraint(columnNames = {"teacher_id", "course_id", "class_name"})
         })
 public class TeacherClass {
     @Id
@@ -27,6 +27,10 @@ public class TeacherClass {
     @ManyToOne
     @JoinColumn(name = "teacher_id", nullable = false)
     private Teacher teacher;
+
+    @ManyToOne
+    @JoinColumn(name = "course_id")
+    private Course course;
 
     @Size(max = 50)
     @Column(nullable = false, name = "class_name")

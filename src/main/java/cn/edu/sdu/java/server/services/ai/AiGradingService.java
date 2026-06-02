@@ -40,6 +40,7 @@ public class AiGradingService {
     public List<Map<String, Object>> listProviders() {
         return loadConfigs().stream()
                 .filter(AiProviderConfig::isEnabled)
+                .sorted(Comparator.comparing(this::isMock))
                 .map(config -> configToMap(config, false))
                 .toList();
     }
@@ -106,7 +107,8 @@ public class AiGradingService {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalArgumentException("AI provider api key is missing: " + config.displayName());
         }
-        if (config.endpoint == null || config.endpoint.isBlank()) {
+        String endpoint = normalizeChatCompletionsEndpoint(config.endpoint);
+        if (endpoint == null || endpoint.isBlank()) {
             throw new IllegalArgumentException("AI provider endpoint is missing: " + config.displayName());
         }
         try {
@@ -122,8 +124,10 @@ public class AiGradingService {
                     Map.of("role", "user", "content", userContent)
             ));
 
+            log.info("AI grading request provider={}, endpoint={}, model={}, apiKey={}",
+                    config.displayName(), endpoint, body.get("model"), maskApiKey(apiKey));
             HttpRequest.Builder builder = HttpRequest.newBuilder()
-                    .uri(URI.create(config.endpoint))
+                    .uri(URI.create(endpoint))
                     .timeout(Duration.ofSeconds(config.timeoutSeconds == null ? 30 : config.timeoutSeconds))
                     .header("Content-Type", "application/json")
                     .header("Authorization", "Bearer " + apiKey)
@@ -132,6 +136,21 @@ public class AiGradingService {
                 config.headers.forEach(builder::header);
             }
             HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() >= 400 && shouldRetryWithoutResponseFormat(response.body())) {
+                log.warn("AI provider rejected response_format, retrying without it: provider={}, status={}",
+                        config.displayName(), response.statusCode());
+                body.remove("response_format");
+                HttpRequest.Builder retryBuilder = HttpRequest.newBuilder()
+                        .uri(URI.create(endpoint))
+                        .timeout(Duration.ofSeconds(config.timeoutSeconds == null ? 30 : config.timeoutSeconds))
+                        .header("Content-Type", "application/json")
+                        .header("Authorization", "Bearer " + apiKey)
+                        .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body), StandardCharsets.UTF_8));
+                if (config.headers != null) {
+                    config.headers.forEach(retryBuilder::header);
+                }
+                response = httpClient.send(retryBuilder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new IllegalStateException("AI provider returned HTTP " + response.statusCode() + ": " + response.body());
             }
@@ -353,12 +372,18 @@ public class AiGradingService {
         config.name = text(form, "name");
         config.provider = text(form, "provider");
         config.enabled = bool(form, "enabled", true);
-        config.endpoint = blankToNull(text(form, "endpoint"));
+        config.endpoint = normalizeChatCompletionsEndpoint(firstText(form, "endpoint", "baseUrl", "baseURL", "base_url"));
         String apiKey = text(form, "apiKey");
         if (apiKey != null && !apiKey.isBlank()) {
             config.apiKey = apiKey.trim();
         }
-        config.apiKeyEnv = blankToNull(text(form, "apiKeyEnv"));
+        String apiKeyEnv = blankToNull(text(form, "apiKeyEnv"));
+        if ((config.apiKey == null || config.apiKey.isBlank()) && isLikelyRawApiKey(apiKeyEnv)) {
+            config.apiKey = apiKeyEnv;
+            config.apiKeyEnv = null;
+        } else {
+            config.apiKeyEnv = apiKeyEnv;
+        }
         config.model = blankToNull(text(form, "model"));
         config.temperature = doubleValue(form, "temperature", 0.0);
         config.maxTokens = intValue(form, "maxTokens", 500);
@@ -378,9 +403,22 @@ public class AiGradingService {
         if (!isMock(config) && (config.endpoint == null || config.endpoint.isBlank())) {
             throw new IllegalArgumentException("非 mock API 必须填写 endpoint");
         }
+        if (!isMock(config)) {
+            config.endpoint = normalizeChatCompletionsEndpoint(config.endpoint);
+        }
         if (config.model == null || config.model.isBlank()) {
             config.model = isMock(config) ? "local-keyword-rubric" : "default";
         }
+    }
+
+    private String firstText(Map<String, Object> map, String... keys) {
+        for (String key : keys) {
+            String value = text(map, key);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private String text(Map<String, Object> map, String key) {
@@ -419,6 +457,38 @@ public class AiGradingService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    private String normalizeChatCompletionsEndpoint(String value) {
+        String endpoint = blankToNull(value);
+        if (endpoint == null) {
+            return null;
+        }
+        endpoint = endpoint.replace('\\', '/');
+        while (endpoint.endsWith("/")) {
+            endpoint = endpoint.substring(0, endpoint.length() - 1);
+        }
+        String lower = endpoint.toLowerCase(Locale.ROOT);
+        if (lower.endsWith("/chat/completions")) {
+            return endpoint;
+        }
+        return endpoint + "/chat/completions";
+    }
+
+    private String maskApiKey(String apiKey) {
+        if (apiKey == null || apiKey.isBlank()) {
+            return "<empty>";
+        }
+        String trimmed = apiKey.trim();
+        if (trimmed.length() <= 10) {
+            return "***";
+        }
+        return trimmed.substring(0, Math.min(6, trimmed.length())) + "***" + trimmed.substring(trimmed.length() - 4);
+    }
+
+    private boolean shouldRetryWithoutResponseFormat(String body) {
+        String text = body == null ? "" : body.toLowerCase(Locale.ROOT);
+        return text.contains("response_format") || text.contains("json_object");
+    }
+
     private boolean isMock(AiProviderConfig config) {
         String provider = config.provider == null ? "" : config.provider;
         return provider.isBlank() || "mock".equalsIgnoreCase(provider);
@@ -429,9 +499,27 @@ public class AiGradingService {
             return config.apiKey;
         }
         if (config.apiKeyEnv != null && !config.apiKeyEnv.isBlank()) {
-            return System.getenv(config.apiKeyEnv);
+            String envValue = System.getenv(config.apiKeyEnv);
+            if (envValue != null && !envValue.isBlank()) {
+                return envValue;
+            }
+            if (isLikelyRawApiKey(config.apiKeyEnv)) {
+                log.warn("AI provider {} stores a raw key in apiKeyEnv; use apiKey field instead.", config.displayName());
+                return config.apiKeyEnv;
+            }
         }
         return null;
+    }
+
+    private boolean isLikelyRawApiKey(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        String trimmed = value.trim();
+        if (trimmed.startsWith("sk-")) {
+            return true;
+        }
+        return trimmed.length() > 40 && !trimmed.matches("[A-Za-z_][A-Za-z0-9_]*");
     }
 
     private String loadSkillPrompt() {
