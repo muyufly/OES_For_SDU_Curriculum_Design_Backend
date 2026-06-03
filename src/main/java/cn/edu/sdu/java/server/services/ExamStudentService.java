@@ -26,6 +26,7 @@ public class ExamStudentService {
     private final ScoreRepository scoreRepository;
     private final StudentExamAttemptRepository studentExamAttemptRepository;
     private final StudentCourseClassRepository studentCourseClassRepository;
+    private final CourseRepository courseRepository;
 
     public ExamStudentService(ExamRepository examRepository,
                               ExamQuestionRelRepository examQuestionRelRepository,
@@ -34,7 +35,8 @@ public class ExamStudentService {
                               StudentRepository studentRepository,
                               ScoreRepository scoreRepository,
                               StudentExamAttemptRepository studentExamAttemptRepository,
-                              StudentCourseClassRepository studentCourseClassRepository) {
+                              StudentCourseClassRepository studentCourseClassRepository,
+                              CourseRepository courseRepository) {
         this.examRepository = examRepository;
         this.examQuestionRelRepository = examQuestionRelRepository;
         this.questionRepository = questionRepository;
@@ -43,6 +45,7 @@ public class ExamStudentService {
         this.scoreRepository = scoreRepository;
         this.studentExamAttemptRepository = studentExamAttemptRepository;
         this.studentCourseClassRepository = studentCourseClassRepository;
+        this.courseRepository = courseRepository;
     }
 
     @Transactional
@@ -227,6 +230,78 @@ public class ExamStudentService {
         result.put("courseScores", courseScores);
         result.put("examScores", examScores);
         return CommonMethod.getReturnData(result);
+    }
+
+    @Transactional
+    public DataResponse getMyCourseClasses() {
+        Integer personId = CommonMethod.getPersonId();
+        if (personId == null) {
+            return CommonMethod.getReturnMessageError("无法获取当前学生信息");
+        }
+        List<Map<String, Object>> result = studentCourseClassRepository.findByStudentPersonId(personId)
+                .stream()
+                .map(this::courseClassToMap)
+                .collect(Collectors.toList());
+        return CommonMethod.getReturnData(result);
+    }
+
+    @Transactional
+    public DataResponse saveMyCourseClass(Integer id, Integer courseId, String className) {
+        Integer personId = CommonMethod.getPersonId();
+        if (personId == null) {
+            return CommonMethod.getReturnMessageError("无法获取当前学生信息");
+        }
+        if (courseId == null) {
+            return CommonMethod.getReturnMessageError("请选择课序号。错误设置课序号会导致试卷和成绩不可用");
+        }
+        if (className == null || className.isBlank()) {
+            className = studentRepository.findById(personId).map(Student::getClassName).orElse("");
+        }
+        Optional<Student> studentOp = studentRepository.findById(personId);
+        if (studentOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("学生信息不存在");
+        }
+        Optional<Course> courseOp = courseRepository.findById(courseId);
+        if (courseOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("课程不存在。错误设置课序号会导致试卷和成绩不可用");
+        }
+        StudentCourseClass enrollment;
+        if (id == null) {
+            enrollment = studentCourseClassRepository
+                    .findByStudentPersonIdAndCourseCourseId(personId, courseId)
+                    .orElseGet(StudentCourseClass::new);
+        } else {
+            Optional<StudentCourseClass> enrollmentOp = studentCourseClassRepository.findById(id);
+            if (enrollmentOp.isEmpty() || enrollmentOp.get().getStudent() == null
+                    || !personId.equals(enrollmentOp.get().getStudent().getPersonId())) {
+                return CommonMethod.getReturnMessageError("课程绑定不存在或无权修改");
+            }
+            Optional<StudentCourseClass> sameCourse = studentCourseClassRepository.findByStudentPersonIdAndCourseCourseId(personId, courseId);
+            if (sameCourse.isPresent() && !sameCourse.get().getId().equals(id)) {
+                return CommonMethod.getReturnMessageError("你已绑定该课序号，不能重复设置");
+            }
+            enrollment = enrollmentOp.get();
+        }
+        enrollment.setStudent(studentOp.get());
+        enrollment.setCourse(courseOp.get());
+        enrollment.setClassName(className.trim());
+        studentCourseClassRepository.save(enrollment);
+        return CommonMethod.getReturnData(courseClassToMap(enrollment), "课程绑定已保存。请确认课序号正确，否则对应成绩可能无效");
+    }
+
+    @Transactional
+    public DataResponse deleteMyCourseClass(Integer id) {
+        Integer personId = CommonMethod.getPersonId();
+        if (personId == null) {
+            return CommonMethod.getReturnMessageError("无法获取当前学生信息");
+        }
+        Optional<StudentCourseClass> enrollmentOp = studentCourseClassRepository.findById(id);
+        if (enrollmentOp.isEmpty() || enrollmentOp.get().getStudent() == null
+                || !personId.equals(enrollmentOp.get().getStudent().getPersonId())) {
+            return CommonMethod.getReturnMessageError("课程绑定不存在或无权删除");
+        }
+        studentCourseClassRepository.deleteById(id);
+        return CommonMethod.getReturnMessageOK("课程绑定已删除。删除错误课序号可能导致成绩和试卷不可见");
     }
 
     @Transactional
@@ -470,6 +545,18 @@ public class ExamStudentService {
         return map;
     }
 
+    private Map<String, Object> courseClassToMap(StudentCourseClass enrollment) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", enrollment.getId());
+        map.put("className", enrollment.getClassName());
+        if (enrollment.getCourse() != null) {
+            map.put("courseId", enrollment.getCourse().getCourseId());
+            map.put("courseNum", enrollment.getCourse().getNum());
+            map.put("courseName", enrollment.getCourse().getName());
+        }
+        return map;
+    }
+
     private Student getCurrentStudent(Integer personId) {
         return studentRepository.findById(personId).orElse(null);
     }
@@ -478,6 +565,7 @@ public class ExamStudentService {
         if (personId == null || exam == null || exam.getCourse() == null || exam.getCourse().getCourseId() == null) {
             return false;
         }
+        // Exam visibility is course-first; class is only display/filter metadata.
         return studentCourseClassRepository
                 .findByStudentPersonIdAndCourseCourseId(personId, exam.getCourse().getCourseId())
                 .isPresent();

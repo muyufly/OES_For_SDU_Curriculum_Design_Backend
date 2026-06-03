@@ -110,11 +110,27 @@ public class ExamAdminController {
         return examAdminService.getCourseClassStudents(courseId, className);
     }
 
+    @GetMapping("/students/{studentId}/course-classes")
+    @RequireRole("ADMIN")
+    public DataResponse getStudentCourseClasses(@PathVariable Integer studentId) {
+        return examAdminService.getStudentCourseClasses(studentId);
+    }
+
     @PostMapping("/course-classes/students")
     @RequireRole("ADMIN")
     public DataResponse assignStudentCourseClass(@Valid @RequestBody DataRequest dataRequest) {
         return examAdminService.assignStudentCourseClass(
                 dataRequest.getInteger("studentId"),
+                dataRequest.getInteger("courseId"),
+                dataRequest.getString("className"));
+    }
+
+    @PutMapping("/course-classes/students/{id}")
+    @RequireRole("ADMIN")
+    public DataResponse updateStudentCourseClass(@PathVariable Integer id,
+                                                 @Valid @RequestBody DataRequest dataRequest) {
+        return examAdminService.updateStudentCourseClass(
+                id,
                 dataRequest.getInteger("courseId"),
                 dataRequest.getString("className"));
     }

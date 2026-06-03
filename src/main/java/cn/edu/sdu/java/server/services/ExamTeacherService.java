@@ -70,7 +70,8 @@ public class ExamTeacherService {
         if (teacherId == null) {
             return CommonMethod.getReturnMessageError("无法获取当前教师信息");
         }
-        List<Map<String, Object>> result = examRepository.findByCreatorId(teacherId).stream()
+        List<Map<String, Object>> result = examRepository.findAll().stream()
+                .filter(this::ownsExam)
                 .map(this::examToMap)
                 .collect(Collectors.toList());
         return CommonMethod.getReturnData(result);
@@ -116,6 +117,9 @@ public class ExamTeacherService {
         Optional<Course> courseOp = courseRepository.findById(courseId);
         if (courseOp.isEmpty()) {
             return CommonMethod.getReturnMessageError("课程不存在");
+        }
+        if (!teacherCanManageCourse(courseOp.get())) {
+            return CommonMethod.getReturnMessageError("您尚未绑定该课序号，不能将试卷设置到该课程");
         }
         try {
             startTime = ExamPaperParser.normalizeStartTime(startTime);
@@ -197,6 +201,9 @@ public class ExamTeacherService {
             Optional<Course> courseOp = courseRepository.findById(parsed.courseId);
             if (courseOp.isEmpty()) {
                 return CommonMethod.getReturnMessageError("课程不存在：" + parsed.courseId);
+            }
+            if (!teacherCanManageCourse(courseOp.get())) {
+                return CommonMethod.getReturnMessageError("您尚未绑定该课序号，不能上传该课程试卷");
             }
 
             Exam exam = new Exam();
@@ -407,10 +414,22 @@ public class ExamTeacherService {
 
     public DataResponse getClassStudentExamRecords() {
         List<Map<String, Object>> resultList = new ArrayList<>();
-        for (TeacherClass binding : getTeacherBindings(null)) {
-            List<Student> students = studentsForBinding(binding);
-            for (Student s : students) {
-                List<StudentExamRecord> records = studentExamRecordRepository.findByStudentPersonIdIn(List.of(s.getPersonId()));
+        for (Integer studentId : getManagedStudentIds(null)) {
+            Student s = studentRepository.findById(studentId).orElse(null);
+            if (s == null) {
+                continue;
+            }
+            List<StudentExamRecord> records = studentExamRecordRepository.findByStudentPersonIdIn(List.of(s.getPersonId()));
+            Set<Integer> managedCourseIds = getTeacherBindings(null).stream()
+                    .map(TeacherClass::getCourse)
+                    .filter(Objects::nonNull)
+                    .map(Course::getCourseId)
+                    .collect(Collectors.toSet());
+            records = records.stream()
+                    .filter(record -> record.getExam() != null
+                            && record.getExam().getCourse() != null
+                            && managedCourseIds.contains(record.getExam().getCourse().getCourseId()))
+                    .collect(Collectors.toList());
                 Map<Integer, List<StudentExamRecord>> examGroups = records.stream()
                         .collect(Collectors.groupingBy(r -> r.getExam().getExamId()));
                 for (Map.Entry<Integer, List<StudentExamRecord>> entry : examGroups.entrySet()) {
@@ -425,7 +444,6 @@ public class ExamTeacherService {
                     m.put("submitTime", examRecords.get(0).getSubmitTime());
                     resultList.add(m);
                 }
-            }
         }
         return CommonMethod.getReturnData(resultList);
     }
@@ -689,8 +707,7 @@ public class ExamTeacherService {
     }
 
     private boolean ownsExam(Exam exam) {
-        Integer teacherId = CommonMethod.getPersonId();
-        return teacherId != null && exam.getCreatorId() != null && exam.getCreatorId().equals(teacherId);
+        return exam != null && teacherCanManageCourse(exam.getCourse());
     }
 
     private void closeExpiredDrafts(Integer examId) {
@@ -783,8 +800,14 @@ public class ExamTeacherService {
     private Set<Integer> getManagedStudentIds(Course course) {
         Set<Integer> ids = new HashSet<>();
         for (TeacherClass binding : getTeacherBindings(course)) {
-            for (Student student : studentsForBinding(binding)) {
-                ids.add(student.getPersonId());
+            if (binding.getCourse() == null || binding.getCourse().getCourseId() == null) {
+                continue;
+            }
+            for (StudentCourseClass enrollment : studentCourseClassRepository.findByCourseCourseId(binding.getCourse().getCourseId())) {
+                Student student = enrollment.getStudent();
+                if (student != null) {
+                    ids.add(student.getPersonId());
+                }
             }
         }
         return ids;
@@ -796,24 +819,19 @@ public class ExamTeacherService {
             return List.of();
         }
         return teacherClassRepository.findByTeacherPersonId(teacherId).stream()
-                .filter(binding -> course == null || binding.getCourse() == null
-                        || binding.getCourse().getCourseId().equals(course.getCourseId()))
+                .filter(binding -> binding.getCourse() != null && binding.getCourse().getCourseId() != null)
+                .filter(binding -> course == null || binding.getCourse().getCourseId().equals(course.getCourseId()))
                 .collect(Collectors.toList());
     }
 
-    private List<Student> studentsForBinding(TeacherClass binding) {
-        if (binding.getCourse() != null) {
-            List<Student> enrolled = studentCourseClassRepository
-                    .findByCourseCourseIdAndClassName(binding.getCourse().getCourseId(), binding.getClassName())
-                    .stream()
-                    .map(StudentCourseClass::getStudent)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-            if (!enrolled.isEmpty()) {
-                return enrolled;
-            }
+    private boolean teacherCanManageCourse(Course course) {
+        Integer teacherId = CommonMethod.getPersonId();
+        if (teacherId == null || course == null || course.getCourseId() == null) {
+            return false;
         }
-        return studentRepository.findByClassName(binding.getClassName());
+        return !teacherClassRepository
+                .findByTeacherPersonIdAndCourseCourseId(teacherId, course.getCourseId())
+                .isEmpty();
     }
 
     private Map<String, Object> examToMap(Exam exam) {

@@ -268,6 +268,20 @@ public class ExamAdminService {
         return CommonMethod.getReturnData(result);
     }
 
+    public DataResponse getStudentCourseClasses(Integer studentId) {
+        if (studentId == null) {
+            return CommonMethod.getReturnMessageError("学生ID不能为空");
+        }
+        if (!studentRepository.existsById(studentId)) {
+            return CommonMethod.getReturnMessageError("学生不存在");
+        }
+        List<Map<String, Object>> result = studentCourseClassRepository.findByStudentPersonId(studentId)
+                .stream()
+                .map(this::enrollmentToMap)
+                .toList();
+        return CommonMethod.getReturnData(result);
+    }
+
     @Transactional
     public DataResponse assignStudentCourseClass(Integer studentId, Integer courseId, String className) {
         if (studentId == null || courseId == null || className == null || className.isBlank()) {
@@ -289,6 +303,31 @@ public class ExamAdminService {
         enrollment.setClassName(className.trim());
         studentCourseClassRepository.save(enrollment);
         return CommonMethod.getReturnData(enrollmentToMap(enrollment), "学生已加入课程班级");
+    }
+
+    @Transactional
+    public DataResponse updateStudentCourseClass(Integer id, Integer courseId, String className) {
+        if (id == null || courseId == null || className == null || className.isBlank()) {
+            return CommonMethod.getReturnMessageError("参数不完整");
+        }
+        Optional<StudentCourseClass> enrollmentOp = studentCourseClassRepository.findById(id);
+        if (enrollmentOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("关系不存在");
+        }
+        Optional<Course> courseOp = courseRepository.findById(courseId);
+        if (courseOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("课程不存在");
+        }
+        StudentCourseClass enrollment = enrollmentOp.get();
+        Integer studentId = enrollment.getStudent() == null ? null : enrollment.getStudent().getPersonId();
+        Optional<StudentCourseClass> sameCourse = studentCourseClassRepository.findByStudentPersonIdAndCourseCourseId(studentId, courseId);
+        if (sameCourse.isPresent() && !sameCourse.get().getId().equals(id)) {
+            return CommonMethod.getReturnMessageError("该学生已绑定该课序号，不能重复设置");
+        }
+        enrollment.setCourse(courseOp.get());
+        enrollment.setClassName(className.trim());
+        studentCourseClassRepository.save(enrollment);
+        return CommonMethod.getReturnData(enrollmentToMap(enrollment), "学生课程绑定已更新");
     }
 
     public DataResponse deleteStudentCourseClass(Integer id) {

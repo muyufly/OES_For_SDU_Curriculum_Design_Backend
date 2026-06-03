@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface StudentCourseClassRepository extends JpaRepository<StudentCourseClass, Integer> {
+    List<StudentCourseClass> findByCourseCourseId(Integer courseId);
     List<StudentCourseClass> findByCourseCourseIdAndClassName(Integer courseId, String className);
     List<StudentCourseClass> findByStudentPersonId(Integer personId);
     Optional<StudentCourseClass> findByStudentPersonIdAndCourseCourseId(Integer personId, Integer courseId);
