@@ -25,6 +25,7 @@ public class ExamStudentService {
     private final StudentRepository studentRepository;
     private final ScoreRepository scoreRepository;
     private final StudentExamAttemptRepository studentExamAttemptRepository;
+    private final StudentCourseClassRepository studentCourseClassRepository;
 
     public ExamStudentService(ExamRepository examRepository,
                               ExamQuestionRelRepository examQuestionRelRepository,
@@ -32,7 +33,8 @@ public class ExamStudentService {
                               StudentExamRecordRepository studentExamRecordRepository,
                               StudentRepository studentRepository,
                               ScoreRepository scoreRepository,
-                              StudentExamAttemptRepository studentExamAttemptRepository) {
+                              StudentExamAttemptRepository studentExamAttemptRepository,
+                              StudentCourseClassRepository studentCourseClassRepository) {
         this.examRepository = examRepository;
         this.examQuestionRelRepository = examQuestionRelRepository;
         this.questionRepository = questionRepository;
@@ -40,6 +42,7 @@ public class ExamStudentService {
         this.studentRepository = studentRepository;
         this.scoreRepository = scoreRepository;
         this.studentExamAttemptRepository = studentExamAttemptRepository;
+        this.studentCourseClassRepository = studentCourseClassRepository;
     }
 
     @Transactional
@@ -48,6 +51,9 @@ public class ExamStudentService {
         List<Exam> exams = examRepository.findOpenExams();
         List<Map<String, Object>> dataList = new ArrayList<>();
         for (Exam exam : exams) {
+            if (!canStudentAccessExam(personId, exam)) {
+                continue;
+            }
             ensureLegacyAttempt(personId, exam);
             closeExpiredDrafts(exam.getExamId());
             Map<String, Object> map = examToStudentMap(exam, personId);
@@ -67,6 +73,9 @@ public class ExamStudentService {
             return CommonMethod.getReturnMessageError("考试不存在");
         }
         Exam exam = examOp.get();
+        if (!canStudentAccessExam(personId, exam)) {
+            return CommonMethod.getReturnMessageError("您尚未加入该试卷对应课程，不能进入考试");
+        }
         if (parseTime(exam.getStartTime()) == null || parseTime(exam.getEndTime()) == null) {
             return CommonMethod.getReturnMessageError("试卷时间格式异常，请联系教师重新保存试卷时间");
         }
@@ -106,6 +115,9 @@ public class ExamStudentService {
             return CommonMethod.getReturnMessageError("考试不存在");
         }
         Exam exam = examOp.get();
+        if (!canStudentAccessExam(personId, exam)) {
+            return CommonMethod.getReturnMessageError("您尚未加入该试卷对应课程，不能保存草稿");
+        }
         closeExpiredDrafts(examId);
         Optional<StudentExamAttempt> attemptOp = studentExamAttemptRepository.findByStudentPersonIdAndExamExamId(personId, examId);
         if (attemptOp.isEmpty()) {
@@ -137,6 +149,9 @@ public class ExamStudentService {
             return CommonMethod.getReturnMessageError("考试不存在");
         }
         Exam exam = examOp.get();
+        if (!canStudentAccessExam(personId, exam)) {
+            return CommonMethod.getReturnMessageError("您尚未加入该试卷对应课程，不能提交考试");
+        }
         closeExpiredDrafts(examId);
         Optional<StudentExamAttempt> attemptOp = studentExamAttemptRepository.findByStudentPersonIdAndExamExamId(personId, examId);
         if (attemptOp.isEmpty()) {
@@ -156,6 +171,13 @@ public class ExamStudentService {
         Integer personId = CommonMethod.getPersonId();
         if (personId == null) {
             return CommonMethod.getReturnMessageError("无法获取当前学生信息");
+        }
+        Optional<Exam> examOp = examRepository.findById(examId);
+        if (examOp.isEmpty()) {
+            return CommonMethod.getReturnMessageError("考试不存在");
+        }
+        if (!canStudentAccessExam(personId, examOp.get())) {
+            return CommonMethod.getReturnMessageError("您尚未加入该试卷对应课程，不能查看结果");
         }
         closeExpiredDrafts(examId);
         Optional<StudentExamAttempt> attemptOp = studentExamAttemptRepository.findByStudentPersonIdAndExamExamId(personId, examId);
@@ -450,6 +472,15 @@ public class ExamStudentService {
 
     private Student getCurrentStudent(Integer personId) {
         return studentRepository.findById(personId).orElse(null);
+    }
+
+    private boolean canStudentAccessExam(Integer personId, Exam exam) {
+        if (personId == null || exam == null || exam.getCourse() == null || exam.getCourse().getCourseId() == null) {
+            return false;
+        }
+        return studentCourseClassRepository
+                .findByStudentPersonIdAndCourseCourseId(personId, exam.getCourse().getCourseId())
+                .isPresent();
     }
 
     private void syncToScoreTable(Integer personId, Exam exam, int totalScore) {

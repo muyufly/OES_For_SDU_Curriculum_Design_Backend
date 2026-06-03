@@ -50,10 +50,18 @@ public class CourseService {
         Optional<Course> op;
         Course c= null;
 
+        if (num == null || num.isBlank() || name == null || name.isBlank()) {
+            return CommonMethod.getReturnMessageError("课程号和课程名不能为空");
+        }
+
         if(courseId != null) {
             op = courseRepository.findById(courseId);
             if(op.isPresent())
                 c= op.get();
+        }
+        Optional<Course> sameNum = courseRepository.findByNum(num.trim());
+        if (sameNum.isPresent() && (c == null || !sameNum.get().getCourseId().equals(c.getCourseId()))) {
+            return CommonMethod.getReturnMessageError("课程号已存在，请使用唯一课程号");
         }
         if(c== null)
             c = new Course();
@@ -63,13 +71,13 @@ public class CourseService {
             if(op.isPresent())
                 pc = op.get();
         }
-        c.setNum(num);
-        c.setName(name);
+        c.setNum(num.trim());
+        c.setName(name.trim());
         c.setCredit(credit);
         c.setCoursePath(coursePath);
         c.setPreCourse(pc);
         courseRepository.save(c);
-        return CommonMethod.getReturnMessageOK();
+        return CommonMethod.getReturnData(courseToMap(c), "课程保存成功");
     }
     public DataResponse courseDelete(DataRequest dataRequest) {
         Integer courseId = dataRequest.getInteger("courseId");
@@ -83,6 +91,21 @@ public class CourseService {
             }
         }
         return CommonMethod.getReturnMessageOK();
+    }
+
+    private Map<String, Object> courseToMap(Course c) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("courseId", c.getCourseId());
+        m.put("num", c.getNum());
+        m.put("name", c.getName());
+        m.put("credit", c.getCredit());
+        m.put("coursePath", c.getCoursePath());
+        Course pc = c.getPreCourse();
+        if (pc != null) {
+            m.put("preCourse", pc.getName());
+            m.put("preCourseId", pc.getCourseId());
+        }
+        return m;
     }
 
 }
