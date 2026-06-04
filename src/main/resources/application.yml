@@ -14,7 +14,7 @@ spring:
 #    password: JavaServer2025@
     url: jdbc:mysql://202.194.14.120:3306/java_1_05?allowPublicKeyRetrieval=true&useSSL=false
     username: java_1_05
-    password: JavaP105@
+    password: Hong718825@
 #    url: jdbc:mysql://202.194.14.120:3306/java_1_01?allowPublicKeyRetrieval=true&useSSL=false
 #    username: java_1_01
 #    password: JavaP101@
